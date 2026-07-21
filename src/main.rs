@@ -40,9 +40,9 @@ fn main() {
 #[derive(Component)]
 struct Shape;
 
-const SHAPES_X_EXTENT: f32 = 14.0;
-const EXTRUSION_X_EXTENT: f32 = 16.0;
-const Z_EXTENT: f32 = 5.0;
+const SHAPES_X_EXTENT: f32 = 50.0;
+const EXTRUSION_X_EXTENT: f32 = 30.0;
+const Z_EXTENT: f32 = 0.0;
 
 fn setup(
     mut commands: Commands,
@@ -90,7 +90,7 @@ fn setup(
             Mesh3d(shape),
             MeshMaterial3d(debug_material.clone()),
             Transform::from_xyz(
-                -SHAPES_X_EXTENT / 2. + i as f32 / (num_shapes - 1) as f32 * SHAPES_X_EXTENT,
+                i as f32 / (num_shapes - 1) as f32 * SHAPES_X_EXTENT,
                 2.0,
                 Z_EXTENT / 2.,
             )
@@ -106,9 +106,8 @@ fn setup(
             Mesh3d(shape),
             MeshMaterial3d(debug_material.clone()),
             Transform::from_xyz(
-                -EXTRUSION_X_EXTENT / 2.
-                    + i as f32 / (num_extrusions - 1) as f32 * EXTRUSION_X_EXTENT,
-                2.0,
+                i as f32 / (num_extrusions - 1) as f32 * EXTRUSION_X_EXTENT,
+                4.0,
                 -Z_EXTENT / 2.,
             )
             .with_rotation(Quat::from_rotation_x(-PI / 4.)),
@@ -125,12 +124,6 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(8.0, 16.0, 8.0),
-    ));
-
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(0.0, 7., 14.0).looking_at(Vec3::new(0., 1., 0.), Vec3::Y),
-        LiveWallpaperCamera,
     ));
 }
 

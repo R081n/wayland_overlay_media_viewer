@@ -1,12 +1,13 @@
-use std::collections::HashSet;
 use std::io::ErrorKind;
+use std::{collections::HashSet, f32::consts::FRAC_PI_4};
 
 use bevy::{
-    camera::RenderTarget,
+    camera::{ImageRenderTarget, RenderTarget},
+    math::VectorSpace,
     prelude::*,
     render::{
-        Render, RenderApp, RenderSystems, extract_resource::ExtractResourcePlugin,
-        render_resource::Extent3d,
+        Render, RenderApp, RenderSystems, extract_component::ExtractComponentPlugin,
+        extract_resource::ExtractResourcePlugin, render_resource::Extent3d,
     },
 };
 use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
@@ -14,7 +15,7 @@ use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_l
 
 use crate::{
     LiveWallpaperCamera, PointerButton, PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
-    WallpaperTargetMonitor,
+    WallpaperTargetMonitor, backend::wayland::render::SurfaceDescriptorEntry,
 };
 
 use super::{
@@ -66,25 +67,12 @@ impl Plugin for WaylandBackendPlugin {
                 present_wayland_surface.in_set(RenderSystems::Cleanup),
             );
 
-        let target_image = {
-            let mut images = app.world_mut().resource_mut::<Assets<Image>>();
-            create_wayland_image(&mut images)
-        };
-
         app.insert_resource(WaylandSurfaceDescriptor::new())
-            .insert_resource(WaylandRenderTarget::new(target_image))
             .add_plugins((
                 ExtractResourcePlugin::<WaylandSurfaceDescriptor>::default(),
-                ExtractResourcePlugin::<WaylandRenderTarget>::default(),
+                ExtractComponentPlugin::<WaylandRenderTarget>::default(),
             ))
             .add_systems(PostUpdate, wayland_event_system)
-            .add_systems(
-                PostUpdate,
-                (
-                    sync_wayland_render_target_image.after(wayland_event_system),
-                    assign_wayland_camera_target.after(sync_wayland_render_target_image),
-                ),
-            )
             .insert_non_send(WaylandEventQueue(event_queue))
             .insert_non_send(app_state);
     }
@@ -94,12 +82,15 @@ impl Plugin for WaylandBackendPlugin {
 struct WaylandEventQueue(EventQueue<WaylandAppState>);
 
 fn wayland_event_system(
+    mut commands: Commands,
     mut event_queue: NonSendMut<WaylandEventQueue>,
     mut app_state: NonSendMut<WaylandAppState>,
     mut surface_descriptor: ResMut<WaylandSurfaceDescriptor>,
     target_monitor: Res<WallpaperTargetMonitor>,
     mut pointer_state: ResMut<WallpaperPointerState>,
     mut surface_info: ResMut<WallpaperSurfaceInfo>,
+    mut cameras: Query<(&WaylandRenderTarget, &mut Transform, &Projection)>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     if app_state.is_running() {
         if let Err(err) = pump_wayland_events(&mut event_queue, &mut app_state) {
@@ -115,9 +106,12 @@ fn wayland_event_system(
             ensure_surfaces_for_outputs(&mut app_state, &qh, &target_monitor);
 
         if !removed.is_empty() {
-            surface_descriptor
+            for removed in surface_descriptor
                 .surfaces
-                .retain(|s| !removed.contains(&s.output));
+                .extract_if(.., |s| !removed.contains(&s.output))
+            {
+                commands.entity(removed.camera).despawn();
+            }
             touched = true;
         }
 
@@ -126,13 +120,25 @@ fn wayland_event_system(
                 "Wayland surface configured (output {}): {}x{}",
                 surface_config.output, surface_config.width, surface_config.height
             );
-            surface_descriptor.upsert_surface(surface_config);
+            surface_descriptor.upsert_surface(
+                surface_config,
+                spawn_camera(&mut commands, &mut images, surface_config),
+            );
             touched = true;
         }
 
         // Integrate fresh logical positions/sizes from xdg-output / wl_output.
         if apply_output_info_updates(&mut surface_descriptor, &mut app_state) {
             touched = true;
+
+            for desc in &surface_descriptor.surfaces{
+                let Ok((_,mut transform, _)) = cameras.get_mut(desc.camera) else {
+                    continue;
+                };
+
+                *transform = create_transform(&desc);
+
+            }
         }
 
         if touched {
@@ -156,6 +162,66 @@ fn wayland_event_system(
             surface_info.set(min_x, min_y, w, h);
         }
     }
+}
+
+fn create_transform(entry: &SurfaceDescriptorEntry) -> Transform{
+  let fov_v = FRAC_PI_4; 
+    let half_fov_v_tan = (fov_v / 2.0).tan();
+
+    // Target dimensions (w and h)
+    let w_target = entry.width as f32 / 100.0;
+    let h_target = entry.height as f32 / 100.0;
+
+    // 3. Compute distance required for vertical fit (y-axis)
+    let z = h_target / (2.0 * half_fov_v_tan);
+
+    // 4. Translate Bottom-Left corner into World Space Center Coordinates
+    let center_x = entry.offset_x as f32 / 100.0 + (w_target / 2.0);
+    let center_y = entry.offset_y as f32 / 100.0 + (h_target / 2.0);
+
+     Transform::from_translation(Vec3::new(center_x, center_y, z))
+        .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y)
+}
+
+fn spawn_camera(
+    commands: &mut Commands,
+    images: &mut Assets<Image>,
+    config: super::WaylandSurfaceConfig,
+) -> Entity {
+    let image = create_wayland_image(images, config.width, config.height);
+
+    let fov_v = FRAC_PI_4; // Already in radians
+    let half_fov_v_tan = (fov_v / 2.0).tan();
+
+    // Target dimensions (w and h)
+    let w_target = config.width as f32 / 100.0;
+    let h_target = config.height as f32 / 100.0;
+
+    // 3. Compute distance required for vertical fit (y-axis)
+    let z = h_target / (2.0 * half_fov_v_tan);
+
+    // 4. Translate Bottom-Left corner into World Space Center Coordinates
+    let center_x = config.offset_x as f32 / 100.0 + (w_target / 2.0);
+    let center_y = config.offset_y as f32 / 100.0 + (h_target / 2.0);
+
+    let transform = Transform::from_translation(Vec3::new(center_x, center_y, z))
+        .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y);
+
+    commands
+        .spawn((
+            WaylandRenderTarget::new(image.clone()),
+            Camera3d::default(),
+            transform,
+            Projection::Perspective(PerspectiveProjection {
+                fov: fov_v,
+                ..PerspectiveProjection::default()
+            }),
+            RenderTarget::Image(ImageRenderTarget {
+                handle: image,
+                scale_factor: 1.0,
+            }),
+        ))
+        .id()
 }
 
 fn pump_wayland_events(
@@ -295,48 +361,6 @@ fn apply_output_info_updates(
 
     app_state.dirty_outputs.clear();
     changed_any
-}
-
-fn sync_wayland_render_target_image(
-    descriptor: Res<WaylandSurfaceDescriptor>,
-    mut target: ResMut<WaylandRenderTarget>,
-    mut images: ResMut<Assets<Image>>,
-) {
-    let Some((_, _, width, height)) = descriptor.overall_bounds() else {
-        return;
-    };
-
-    if target.last_applied_generation == descriptor.generation {
-        return;
-    }
-
-    if let Some(mut image) = images.get_mut(&target.image) {
-        let size = Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        };
-
-        if image.texture_descriptor.size != size {
-            image.texture_descriptor.size = size;
-        }
-
-        image.resize(size);
-    }
-
-    target.last_applied_generation = descriptor.generation;
-}
-
-fn assign_wayland_camera_target(
-    target: Res<WaylandRenderTarget>,
-    mut commands: Commands,
-    cameras: Query<Entity, With<LiveWallpaperCamera>>,
-) {
-    for entity in &cameras {
-        commands
-            .entity(entity)
-            .insert(RenderTarget::Image(target.image.clone().into()));
-    }
 }
 
 /// Ensure we have a layer-surface for every known output.

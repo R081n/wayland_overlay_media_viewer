@@ -2,13 +2,16 @@ use std::collections::HashMap;
 
 use bevy::{
     asset::RenderAssetUsages,
+    ecs::{component::Component, entity::Entity, system::Query},
     log::{debug, error, warn},
     prelude::{Assets, Handle, Image, Res, ResMut, Resource},
     render::{
+        extract_component::ExtractComponent,
         extract_resource::ExtractResource,
         render_asset::RenderAssets,
         render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
         renderer::{RenderAdapter, RenderDevice, RenderInstance, RenderQueue},
+        sync_world::MainEntity,
         texture::GpuImage,
     },
 };
@@ -21,16 +24,20 @@ use super::surface::WaylandSurfaceHandles;
 
 pub(crate) const WAYLAND_SURFACE_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
-pub(crate) fn create_wayland_image(images: &mut Assets<Image>) -> Handle<Image> {
+pub(crate) fn create_wayland_image(
+    images: &mut Assets<Image>,
+    width: u32,
+    height: u32,
+) -> Handle<Image> {
     let size = Extent3d {
-        width: 1,
-        height: 1,
+        width,
+        height,
         depth_or_array_layers: 1,
     };
     let mut image = Image::new_fill(
         size,
         TextureDimension::D2,
-        &[0, 0, 0, 255],
+        &[0, 0, 0, 0],
         WAYLAND_SURFACE_FORMAT,
         RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
     );
@@ -53,7 +60,7 @@ impl WaylandSurfaceDescriptor {
         }
     }
 
-    pub(crate) fn upsert_surface(&mut self, config: super::WaylandSurfaceConfig) {
+    pub(crate) fn upsert_surface(&mut self, config: super::WaylandSurfaceConfig, camera: Entity) {
         if let Some(entry) = self
             .surfaces
             .iter_mut()
@@ -72,6 +79,7 @@ impl WaylandSurfaceDescriptor {
                 height: config.height,
                 offset_x: config.offset_x,
                 offset_y: config.offset_y,
+                camera,
             });
         }
     }
@@ -111,9 +119,10 @@ pub(crate) struct SurfaceDescriptorEntry {
     pub height: u32,
     pub offset_x: i32,
     pub offset_y: i32,
+    pub camera: Entity,
 }
 
-#[derive(Resource, ExtractResource, Clone, Debug)]
+#[derive(Component, ExtractComponent, Clone, Debug)]
 pub(crate) struct WaylandRenderTarget {
     pub image: Handle<Image>,
     pub last_applied_generation: u64,
@@ -247,18 +256,12 @@ pub(crate) fn prepare_wayland_surface(
 
 pub(crate) fn present_wayland_surface(
     mut state: ResMut<WaylandGpuSurfaceState>,
-    target: Option<Res<WaylandRenderTarget>>,
+    target: Query<(&MainEntity, &WaylandRenderTarget)>,
     images: Res<RenderAssets<GpuImage>>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     descriptor: Res<WaylandSurfaceDescriptor>,
 ) {
-    let Some(target) = target else { return };
-
-    let Some(gpu_image) = images.get(&target.image) else {
-        return;
-    };
-
     let Some((min_x, min_y, _, _)) = descriptor.overall_bounds() else {
         return;
     };
@@ -277,6 +280,14 @@ pub(crate) fn present_wayland_surface(
             .find(|s| s.output == *output && s.handles.is_some())
         else {
             continue;
+        };
+
+        let Some((_, target)) = target.iter().find(|(e, _)| e.id() == desc_entry.camera) else {
+            continue;
+        };
+
+        let Some(gpu_image) = images.get(&target.image) else {
+            return;
         };
 
         let extent = Extent3d {
@@ -328,7 +339,7 @@ pub(crate) fn present_wayland_surface(
         };
 
         let mut src = gpu_image.texture.as_image_copy();
-        src.origin = src_origin;
+        //src.origin = src_origin;
 
         let dst = wgpu::TexelCopyTextureInfo {
             texture: &surface_texture.texture,
