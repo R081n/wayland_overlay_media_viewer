@@ -6,7 +6,6 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
 };
-use bevy_sprite3d::Sprite3d;
 
 #[derive(Message, Clone)]
 pub struct ObjectMessage {
@@ -50,6 +49,8 @@ impl Plugin for PopupPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PendingAssets::default())
             .add_message::<ObjectMessage>()
+            .insert_resource(DefaultMeshes::default())
+            .add_systems(Startup, init_rect_mesh)
             .add_systems(Update, (preload_asset, spawn_object).chain());
     }
 }
@@ -57,6 +58,16 @@ impl Plugin for PopupPlugin {
 #[derive(Default, Resource)]
 pub struct PendingAssets {
     pending: HashMap<UntypedHandle, Vec<ObjectMessage>>,
+}
+
+#[derive(Default, Resource)]
+pub struct DefaultMeshes {
+    rect: Handle<Mesh>,
+}
+
+fn init_rect_mesh(mut meshes: ResMut<Assets<Mesh>>, mut default_meshes: ResMut<DefaultMeshes>) {
+    let handle = meshes.add(Rectangle::from_size(Vec2::ONE));
+    default_meshes.rect = handle;
 }
 
 fn preload_asset(
@@ -78,44 +89,58 @@ fn preload_asset(
     }
 }
 
+struct ImageMesh {
+    handle: Handle<Mesh>,
+}
+
+struct CommonProps<'a> {
+    commands: EntityCommands<'a>,
+    scale: Vec3,
+}
 fn spawn_object(
     mut commands: Commands,
     mut pending: ResMut<PendingAssets>,
     server: ResMut<AssetServer>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+    mut default_meshes: Res<DefaultMeshes>,
 ) {
     for (id, pending) in pending
         .pending
         .extract_if(|id, _| server.is_loaded_with_dependencies(id))
     {
         for msg in pending {
-            let mut command = match msg.kind {
+            let mut common = match msg.kind {
                 ObjectType::Image(popup_image) => {
                     let Ok(asset) = id.clone().try_typed::<Image>() else {
                         continue;
                     };
 
-                    commands.spawn((
-                        Sprite {
-                            image: asset,
-                            ..default()
-                        },
-                        Sprite3d {
-                            pixels_per_metre: PIXELS_PER_METER,
-                            unlit: true,
-                            alpha_mode: AlphaMode::Blend,
-                            double_sided: true,
+                    let image = images.get(&asset).expect("asset to exist");
 
-                            ..default() // pivot: Some(Vec2::new(0.5, 0.5)),
-                                        // double_sided: true,
-                        },
-                    ))
+                    CommonProps {
+                        commands: commands.spawn((
+                            Mesh3d(default_meshes.rect.clone()),
+                            MeshMaterial3d(materials.add(StandardMaterial {
+                                base_color: Color::Srgba(Srgba::new(1., 1., 1., 0.1)),
+                                unlit: true,
+                                base_color_texture: Some(asset),
+                                alpha_mode: AlphaMode::Blend,
+                                ..default()
+                            })),
+                        )),
+                        scale: Vec3::new(image.width() as f32, image.height() as f32, 0.)
+                            / PIXELS_PER_METER,
+                    }
                 }
                 ObjectType::Video(popup_video) => todo!(),
             };
 
             match msg.position {
                 PopupPosition::Global(vec3) => {
-                    command.insert(Transform::from_translation(vec3));
+                    common
+                        .commands
+                        .insert(Transform::from_translation(vec3).with_scale(common.scale));
                 }
                 PopupPosition::SceenSpace(_, vec2) => todo!(),
                 PopupPosition::Random => todo!(),

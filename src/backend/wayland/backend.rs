@@ -136,7 +136,7 @@ fn wayland_event_system(
                     continue;
                 };
 
-                (*transform,*position) = create_transform(&desc);
+                (*transform, *position) = create_transform(&desc);
             }
         }
 
@@ -182,8 +182,10 @@ fn create_transform(entry: &SurfaceDescriptorEntry) -> (Transform, ScreenPositio
         Transform::from_translation(Vec3::new(center_x, center_y, z))
             .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y),
         ScreenPosition {
-            bottom_right: Vec2::new(entry.offset_x as f32, entry.offset_y as f32),
-            size: Rectangle::from_size(Vec2::new(entry.width as f32, entry.height as f32)),
+            rect: Rect::from_center_size(
+                Vec2::new(center_x, center_y),
+                Vec2::new(w_target, h_target),
+            ),
         },
     )
 }
@@ -222,8 +224,10 @@ fn spawn_camera(
                 ..PerspectiveProjection::default()
             }),
             ScreenPosition {
-                bottom_right: Vec2::new(config.offset_x as f32, config.offset_y as f32),
-                size: Rectangle::from_size(Vec2::new(config.width as f32, config.height as f32)),
+                rect: Rect::from_center_size(
+                    Vec2::new(center_x, center_y),
+                    Vec2::new(w_target, h_target),
+                ),
             },
             RenderTarget::Image(ImageRenderTarget {
                 handle: image,

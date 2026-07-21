@@ -1,15 +1,18 @@
 // https://github.com/bevyengine/bevy/blob/v0.17.2/examples/3d/3d_shapes.rs
 
-use std::f32::consts::PI;
+use std::{
+    f32::consts::PI,
+    sync::{Arc, Mutex},
+};
 
 use bevy::{
     asset::{io::web::WebAssetPlugin, RenderAssetUsages},
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
-use bevy_sprite3d::Sprite3dPlugin;
 use wayland_overlay_media_viewer::{
     spawner::{ObjectMessage, PopupImage, PopupPlugin},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoPlugin, VideoState},
     WallpaperTargetMonitor, WindowOverlayPlugin,
 };
 
@@ -17,6 +20,10 @@ fn main() {
     let mut app = App::new();
 
     app.insert_resource(ClearColor(Color::srgba_u32(0)));
+    app.add_systems(
+        Update,
+        wayland_overlay_media_viewer::videos::plugin::render_video_frame,
+    );
 
     let mut window_plugin = WindowPlugin::default();
 
@@ -34,8 +41,8 @@ fn main() {
                 unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                 ..Default::default()
             }),
-        Sprite3dPlugin,
         PopupPlugin,
+        VideoPlugin,
     ));
 
     app.add_plugins(WindowOverlayPlugin {
@@ -110,6 +117,25 @@ fn setup(
         ));
     }
 
+    //"https://video.blender.org/w/4pSeQCu9XXz9wWMh5gTNMf"
+
+    let video_player = VideoPlayer {
+        uri: "/home/robink/Downloads/Big_Buck_Bunny_1080_10s_5MB.mp4".to_string(),
+        state: VideoState::Start,
+        timer: Arc::new(Mutex::new(Timer::from_seconds(0.001, TimerMode::Repeating))),
+        width: 7.0,
+        height: 4.0,
+        id: None,
+        pipeline: None,
+    };
+
+    commands
+        .spawn((
+            insert_video_component(images, Vec2::new(1.0, 2.0)),
+            Transform::from_translation(Vec3::new(3., 4., 0.)),
+        ))
+        .insert(video_player);
+
     let num_extrusions = extrusions.len();
 
     for (i, shape) in extrusions.into_iter().enumerate() {
@@ -138,7 +164,7 @@ fn setup(
 
     commands.write_message(ObjectMessage {
         kind: wayland_overlay_media_viewer::spawner::ObjectType::Image(PopupImage {
-            uri: "".to_owned(),
+            uri: "/home/robink/Pictures/Screenshot_20220203_103901.png".to_owned(),
         }),
         position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
             14., 7., 0.,

@@ -17,8 +17,12 @@ wayland-backend = { version = "0.3.11", features = ["client_system"] }
 wayland-client = { version = "0.31.11" }
 wayland-protocols = { version = "0.32.9", features = ["client", "unstable"] }
 wayland-protocols-wlr = { version = "0.3.8", features = ["client"] }
-bevy_sprite3d = "9.0.0"
 
+#videos
+ffmpeg-next = "8.0"
+cpal = "0.15"
+image = "0.25"
+ringbuf = "0.4"
 
 [dependencies.bevy]
 version = "0.19"

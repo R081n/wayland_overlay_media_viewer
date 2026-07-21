@@ -1,6 +1,6 @@
 use bevy::{
     ecs::component::Component,
-    math::{primitives::Rectangle, Vec2, Vec3},
+    math::{Rect, Vec2, Vec3, primitives::Rectangle},
 };
 
 #[derive(Debug, Clone)]
@@ -14,6 +14,5 @@ pub const PIXELS_PER_METER: f32 = 100.0;
 
 #[derive(Component)]
 pub struct ScreenPosition {
-    pub bottom_right: Vec2,
-    pub size: Rectangle,
+    pub rect: Rect,
 }
