@@ -17,7 +17,7 @@ use wgpu::{
     SurfaceConfiguration, SurfaceTargetUnsafe, TextureAspect,
 };
 
-use crate::wayland::surface::WaylandSurfaceHandles;
+use super::surface::WaylandSurfaceHandles;
 
 pub(crate) const WAYLAND_SURFACE_FORMAT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 
@@ -53,7 +53,7 @@ impl WaylandSurfaceDescriptor {
         }
     }
 
-    pub(crate) fn upsert_surface(&mut self, config: crate::wayland::WaylandSurfaceConfig) {
+    pub(crate) fn upsert_surface(&mut self, config: super::WaylandSurfaceConfig) {
         if let Some(entry) = self
             .surfaces
             .iter_mut()
