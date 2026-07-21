@@ -7,9 +7,7 @@ use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
-use wayland_overlay_media_viewer::{
-    LiveWallpaperCamera, WallpaperTargetMonitor, WindowOverlayPlugin,
-};
+use wayland_overlay_media_viewer::{WallpaperTargetMonitor, WindowOverlayPlugin};
 
 fn main() {
     let mut app = App::new();

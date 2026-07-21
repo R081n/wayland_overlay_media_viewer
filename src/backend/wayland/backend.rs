@@ -3,18 +3,17 @@ use std::{collections::HashSet, f32::consts::FRAC_PI_4};
 
 use bevy::{
     camera::{ImageRenderTarget, RenderTarget},
-    math::VectorSpace,
     prelude::*,
     render::{
         Render, RenderApp, RenderSystems, extract_component::ExtractComponentPlugin,
-        extract_resource::ExtractResourcePlugin, render_resource::Extent3d,
+        extract_resource::ExtractResourcePlugin
     },
 };
 use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
 use crate::{
-    LiveWallpaperCamera, PointerButton, PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
+     PointerButton, PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
     WallpaperTargetMonitor, backend::wayland::render::SurfaceDescriptorEntry,
 };
 

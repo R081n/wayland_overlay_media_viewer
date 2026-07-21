@@ -125,15 +125,11 @@ pub(crate) struct SurfaceDescriptorEntry {
 #[derive(Component, ExtractComponent, Clone, Debug)]
 pub(crate) struct WaylandRenderTarget {
     pub image: Handle<Image>,
-    pub last_applied_generation: u64,
 }
 
 impl WaylandRenderTarget {
     pub(crate) fn new(image: Handle<Image>) -> Self {
-        Self {
-            image,
-            last_applied_generation: 0,
-        }
+        Self { image }
     }
 }
 
@@ -262,10 +258,6 @@ pub(crate) fn present_wayland_surface(
     render_queue: Res<RenderQueue>,
     descriptor: Res<WaylandSurfaceDescriptor>,
 ) {
-    let Some((min_x, min_y, _, _)) = descriptor.overall_bounds() else {
-        return;
-    };
-
     for (output, entry) in state.surfaces.iter_mut() {
         let Some(surface) = entry.surface.as_ref() else {
             continue;
@@ -332,14 +324,7 @@ pub(crate) fn present_wayland_surface(
             label: Some("wayland-surface-present"),
         });
 
-        let src_origin = Origin3d {
-            x: (desc_entry.offset_x - min_x).max(0) as u32,
-            y: (desc_entry.offset_y - min_y).max(0) as u32,
-            z: 0,
-        };
-
-        let mut src = gpu_image.texture.as_image_copy();
-        //src.origin = src_origin;
+        let src = gpu_image.texture.as_image_copy();
 
         let dst = wgpu::TexelCopyTextureInfo {
             texture: &surface_texture.texture,
