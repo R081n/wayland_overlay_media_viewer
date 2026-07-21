@@ -12,6 +12,7 @@ use bevy::{
 use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
+use crate::position::{PIXELS_PER_METER, ScreenPosition};
 use crate::{
     PointerButton, PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
     WallpaperTargetMonitor, backend::wayland::render::SurfaceDescriptorEntry,
@@ -88,7 +89,7 @@ fn wayland_event_system(
     target_monitor: Res<WallpaperTargetMonitor>,
     mut pointer_state: ResMut<WallpaperPointerState>,
     mut surface_info: ResMut<WallpaperSurfaceInfo>,
-    mut cameras: Query<(&WaylandRenderTarget, &mut Transform, &Projection)>,
+    mut cameras: Query<(&WaylandRenderTarget, &mut Transform, &mut ScreenPosition)>,
     mut images: ResMut<Assets<Image>>,
 ) {
     if app_state.is_running() {
@@ -131,11 +132,11 @@ fn wayland_event_system(
             touched = true;
 
             for desc in &surface_descriptor.surfaces {
-                let Ok((_, mut transform, _)) = cameras.get_mut(desc.camera) else {
+                let Ok((_, mut transform, mut position)) = cameras.get_mut(desc.camera) else {
                     continue;
                 };
 
-                *transform = create_transform(&desc);
+                (*transform,*position) = create_transform(&desc);
             }
         }
 
@@ -162,23 +163,29 @@ fn wayland_event_system(
     }
 }
 
-fn create_transform(entry: &SurfaceDescriptorEntry) -> Transform {
+fn create_transform(entry: &SurfaceDescriptorEntry) -> (Transform, ScreenPosition) {
     let fov_v = FRAC_PI_4;
     let half_fov_v_tan = (fov_v / 2.0).tan();
 
     // Target dimensions (w and h)
-    let w_target = entry.width as f32 / 100.0;
-    let h_target = entry.height as f32 / 100.0;
+    let w_target = entry.width as f32 / PIXELS_PER_METER;
+    let h_target = entry.height as f32 / PIXELS_PER_METER;
 
     // 3. Compute distance required for vertical fit (y-axis)
     let z = h_target / (2.0 * half_fov_v_tan);
 
     // 4. Translate Bottom-Left corner into World Space Center Coordinates
-    let center_x = entry.offset_x as f32 / 100.0 + (w_target / 2.0);
-    let center_y = entry.offset_y as f32 / 100.0 + (h_target / 2.0);
+    let center_x = entry.offset_x as f32 / PIXELS_PER_METER + (w_target / 2.0);
+    let center_y = entry.offset_y as f32 / PIXELS_PER_METER + (h_target / 2.0);
 
-    Transform::from_translation(Vec3::new(center_x, center_y, z))
-        .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y)
+    (
+        Transform::from_translation(Vec3::new(center_x, center_y, z))
+            .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y),
+        ScreenPosition {
+            bottom_right: Vec2::new(entry.offset_x as f32, entry.offset_y as f32),
+            size: Rectangle::from_size(Vec2::new(entry.width as f32, entry.height as f32)),
+        },
+    )
 }
 
 fn spawn_camera(
@@ -192,15 +199,15 @@ fn spawn_camera(
     let half_fov_v_tan = (fov_v / 2.0).tan();
 
     // Target dimensions (w and h)
-    let w_target = config.width as f32 / 100.0;
-    let h_target = config.height as f32 / 100.0;
+    let w_target = config.width as f32 / PIXELS_PER_METER;
+    let h_target = config.height as f32 / PIXELS_PER_METER;
 
     // 3. Compute distance required for vertical fit (y-axis)
     let z = h_target / (2.0 * half_fov_v_tan);
 
     // 4. Translate Bottom-Left corner into World Space Center Coordinates
-    let center_x = config.offset_x as f32 / 100.0 + (w_target / 2.0);
-    let center_y = config.offset_y as f32 / 100.0 + (h_target / 2.0);
+    let center_x = config.offset_x as f32 / PIXELS_PER_METER + (w_target / 2.0);
+    let center_y = config.offset_y as f32 / PIXELS_PER_METER + (h_target / 2.0);
 
     let transform = Transform::from_translation(Vec3::new(center_x, center_y, z))
         .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y);
@@ -214,6 +221,10 @@ fn spawn_camera(
                 fov: fov_v,
                 ..PerspectiveProjection::default()
             }),
+            ScreenPosition {
+                bottom_right: Vec2::new(config.offset_x as f32, config.offset_y as f32),
+                size: Rectangle::from_size(Vec2::new(config.width as f32, config.height as f32)),
+            },
             RenderTarget::Image(ImageRenderTarget {
                 handle: image,
                 scale_factor: 1.0,

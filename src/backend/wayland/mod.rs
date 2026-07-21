@@ -117,7 +117,6 @@ impl WaylandAppState {
     }
 
     pub(crate) fn queue_surface_config(&mut self, surface_state: WaylandSurfaceConfig) {
-        dbg!(surface_state);
         self.pending_surface_config.push(surface_state);
     }
 
@@ -559,7 +558,6 @@ impl Dispatch<zxdg_output_v1::ZxdgOutputV1, u32> for WaylandAppState {
     ) {
         match event {
             zxdg_output_v1::Event::LogicalPosition { x, y } => {
-                dbg!("logical pos");
                 let info = state.output_info.entry(*output_name).or_default();
                 info.x = x;
                 info.y = y;

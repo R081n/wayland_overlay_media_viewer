@@ -3,7 +3,7 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    asset::RenderAssetUsages,
+    asset::{io::web::WebAssetPlugin, RenderAssetUsages},
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
@@ -11,6 +11,10 @@ use wayland_overlay_media_viewer::{WallpaperTargetMonitor, WindowOverlayPlugin};
 
 fn main() {
     let mut app = App::new();
+
+    app.add_plugins(DefaultPlugins.set(WebAssetPlugin {
+        silence_startup_warning: true,
+    }));
 
     app.insert_resource(ClearColor(Color::srgba_u32(0)));
 
@@ -112,6 +116,11 @@ fn setup(
             Shape,
         ));
     }
+
+    commands.spawn((
+        Text2d("Hello".to_owned()),
+        Transform::from_translation(Vec3::new(20., 60., 0.)),
+    ));
 
     commands.spawn((
         PointLight {

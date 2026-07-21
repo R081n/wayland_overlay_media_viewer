@@ -6,7 +6,8 @@ edition = "2024"
 [dependencies]
 
 # TODO remove unneded features
-bevy = "0.19"
+
+bevy = { version = "0.19", features = ["http", "https"] }
 clap = { version = "4.5", features = ["derive"] }
 
 raw-window-handle = "0.6.2"
@@ -17,3 +18,4 @@ wayland-backend = { version = "0.3.11", features = ["client_system"] }
 wayland-client = { version = "0.31.11" }
 wayland-protocols = { version = "0.32.9", features = ["client", "unstable"] }
 wayland-protocols-wlr = { version = "0.3.8", features = ["client"] }
+bevy_sprite3d = "9.0.0"

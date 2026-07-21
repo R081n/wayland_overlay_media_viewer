@@ -4,7 +4,6 @@
 //! X11, and Windows. Pick the matching backend feature (`wayland` or `x11`) on
 //! Linux/BSD; Windows works with defaults.
 
-pub mod camera;
 pub mod input;
 pub mod plugin;
 pub mod surface_info;
@@ -14,7 +13,6 @@ mod wayland;
 
 pub use plugin::WindowOverlayPlugin;
 
-pub use camera::LiveWallpaperCamera;
 pub use input::{PointerButton, PointerSample, WallpaperPointerState};
 pub use surface_info::WallpaperSurfaceInfo;
 pub use target_monitor::WallpaperTargetMonitor;
