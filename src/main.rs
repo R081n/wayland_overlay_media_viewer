@@ -4,11 +4,9 @@ use std::f32::consts::PI;
 
 use bevy::{
     asset::RenderAssetUsages,
-    color::palettes::basic::SILVER,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
-use clap::ValueEnum;
 use wayland_overlay_media_viewer::{
     LiveWallpaperCamera, WallpaperTargetMonitor, WindowOverlayPlugin,
 };

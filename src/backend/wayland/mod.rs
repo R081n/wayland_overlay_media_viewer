@@ -589,12 +589,12 @@ impl Dispatch<wl_compositor::WlCompositor, ()> for WaylandAppState {
 
 impl Dispatch<WlRegion, ()> for WaylandAppState {
     fn event(
-        state: &mut Self,
-        proxy: &WlRegion,
-        event: <WlRegion as Proxy>::Event,
-        data: &(),
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _state: &mut Self,
+        _proxy: &WlRegion,
+        _event: <WlRegion as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
         todo!()
     }
