@@ -6,14 +6,14 @@ use bevy::{
     prelude::*,
     render::{
         Render, RenderApp, RenderSystems, extract_component::ExtractComponentPlugin,
-        extract_resource::ExtractResourcePlugin
+        extract_resource::ExtractResourcePlugin,
     },
 };
 use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
 use crate::{
-     PointerButton, PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
+    PointerButton, PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
     WallpaperTargetMonitor, backend::wayland::render::SurfaceDescriptorEntry,
 };
 
@@ -130,13 +130,12 @@ fn wayland_event_system(
         if apply_output_info_updates(&mut surface_descriptor, &mut app_state) {
             touched = true;
 
-            for desc in &surface_descriptor.surfaces{
-                let Ok((_,mut transform, _)) = cameras.get_mut(desc.camera) else {
+            for desc in &surface_descriptor.surfaces {
+                let Ok((_, mut transform, _)) = cameras.get_mut(desc.camera) else {
                     continue;
                 };
 
                 *transform = create_transform(&desc);
-
             }
         }
 
@@ -163,8 +162,8 @@ fn wayland_event_system(
     }
 }
 
-fn create_transform(entry: &SurfaceDescriptorEntry) -> Transform{
-  let fov_v = FRAC_PI_4; 
+fn create_transform(entry: &SurfaceDescriptorEntry) -> Transform {
+    let fov_v = FRAC_PI_4;
     let half_fov_v_tan = (fov_v / 2.0).tan();
 
     // Target dimensions (w and h)
@@ -178,7 +177,7 @@ fn create_transform(entry: &SurfaceDescriptorEntry) -> Transform{
     let center_x = entry.offset_x as f32 / 100.0 + (w_target / 2.0);
     let center_y = entry.offset_y as f32 / 100.0 + (h_target / 2.0);
 
-     Transform::from_translation(Vec3::new(center_x, center_y, z))
+    Transform::from_translation(Vec3::new(center_x, center_y, z))
         .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y)
 }
 
