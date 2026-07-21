@@ -7,14 +7,14 @@ use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
-use wayland_overlay_media_viewer::{WallpaperTargetMonitor, WindowOverlayPlugin};
+use bevy_sprite3d::Sprite3dPlugin;
+use wayland_overlay_media_viewer::{
+    spawner::{ObjectMessage, PopupImage, PopupPlugin},
+    WallpaperTargetMonitor, WindowOverlayPlugin,
+};
 
 fn main() {
     let mut app = App::new();
-
-    app.add_plugins(DefaultPlugins.set(WebAssetPlugin {
-        silence_startup_warning: true,
-    }));
 
     app.insert_resource(ClearColor(Color::srgba_u32(0)));
 
@@ -23,11 +23,20 @@ fn main() {
     window_plugin.primary_window = None;
     window_plugin.exit_condition = bevy::window::ExitCondition::DontExit;
 
-    app.add_plugins(
+    app.add_plugins((
         DefaultPlugins
             .set(ImagePlugin::default_nearest())
-            .set(window_plugin),
-    );
+            .set(WebAssetPlugin {
+                silence_startup_warning: true,
+            })
+            .set(window_plugin)
+            .set(AssetPlugin {
+                unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
+                ..Default::default()
+            }),
+        Sprite3dPlugin,
+        PopupPlugin,
+    ));
 
     app.add_plugins(WindowOverlayPlugin {
         target_monitor: WallpaperTargetMonitor::All,
@@ -121,6 +130,22 @@ fn setup(
         Text2d("Hello".to_owned()),
         Transform::from_translation(Vec3::new(20., 60., 0.)),
     ));
+
+    commands.spawn((
+        Text2d("Hello".to_owned()),
+        Transform::from_translation(Vec3::new(20., 60., 0.)),
+    ));
+
+    commands.write_message(ObjectMessage {
+        kind: wayland_overlay_media_viewer::spawner::ObjectType::Image(PopupImage {
+            uri: "".to_owned(),
+        }),
+        position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
+            14., 7., 0.,
+        )),
+        popup_animation: wayland_overlay_media_viewer::spawner::PopupAnimation::None,
+        behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
+    });
 
     commands.spawn((
         PointLight {

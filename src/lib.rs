@@ -1,6 +1,6 @@
 mod backend;
-mod images;
-mod position;
-mod spawner;
+pub mod images;
+pub mod position;
+pub mod spawner;
 
 pub use backend::*;

@@ -3,10 +3,10 @@ use bevy::{
     math::{primitives::Rectangle, Vec2, Vec3},
 };
 
+#[derive(Debug, Clone)]
 pub enum PopupPosition {
     Global(Vec3),
-
-    // TODO random screen if we know how to reference
+    SceenSpace(u32 /*or some id */, Vec2),
     Random,
 }
 
