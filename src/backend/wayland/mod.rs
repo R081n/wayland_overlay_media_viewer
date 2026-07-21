@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 use wayland_client::Proxy;
 use wayland_client::protocol::wl_display;
+use wayland_client::protocol::wl_region::WlRegion;
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
     protocol::{
@@ -583,5 +584,18 @@ impl Dispatch<wl_compositor::WlCompositor, ()> for WaylandAppState {
         _qh: &QueueHandle<Self>,
     ) {
         // Do nothing: Compositor never dispatches events.
+    }
+}
+
+impl Dispatch<WlRegion, ()> for WaylandAppState {
+    fn event(
+        state: &mut Self,
+        proxy: &WlRegion,
+        event: <WlRegion as Proxy>::Event,
+        data: &(),
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+        todo!()
     }
 }

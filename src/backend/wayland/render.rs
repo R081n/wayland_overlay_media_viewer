@@ -217,7 +217,7 @@ pub(crate) fn prepare_wayland_surface(
                 .alpha_modes
                 .iter()
                 .copied()
-                .find(|mode| matches!(mode, CompositeAlphaMode::Opaque))
+                .find(|mode| matches!(mode, CompositeAlphaMode::PreMultiplied))
                 .unwrap_or(capabilities.alpha_modes[0]);
 
             let mut usage = TextureUsages::RENDER_ATTACHMENT;

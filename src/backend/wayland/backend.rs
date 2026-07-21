@@ -374,11 +374,18 @@ fn ensure_surfaces_for_outputs(
         let layer_surface = layer_shell.0.get_layer_surface(
             &surface,
             Some(output),
-            zwlr_layer_shell_v1::Layer::Bottom,
+            // TODO TOP or Overlay. Overlay makes sure were the top most
+            // But top allows other thinks above?
+            zwlr_layer_shell_v1::Layer::Overlay,
             format!("egl_background_{output_name}"),
             qh,
             (),
         );
+
+        let region = compositor.0.create_region(qh, ());
+
+        surface.set_input_region(Some(&region));
+
         layer_surface.set_exclusive_zone(-1);
         layer_surface.set_anchor(
             zwlr_layer_surface_v1::Anchor::Top

@@ -16,6 +16,8 @@ use wayland_overlay_media_viewer::{
 fn main() {
     let mut app = App::new();
 
+    app.insert_resource(ClearColor(Color::srgba_u32(0)));
+
     let mut window_plugin = WindowPlugin::default();
 
     window_plugin.primary_window = None;
@@ -125,12 +127,6 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(8.0, 16.0, 8.0),
-    ));
-
-    // ground plane
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(50.0, 50.0).subdivisions(10))),
-        MeshMaterial3d(materials.add(Color::from(SILVER))),
     ));
 
     commands.spawn((
