@@ -345,7 +345,8 @@ impl FfmpegPlayer {
                     .lock()
                     .map(|f| f.len() >= PREBUFFER_FRAMES)
                     .unwrap_or(false);
-                let audio_ready = audio_samples_pushed >= prebuffer_audio_samples;
+                let audio_ready =
+                    audio_samples_pushed >= prebuffer_audio_samples || audio_stream_index.is_none();
 
                 if frame_count % 10 == 0 {
                     let _video_len = frame_queue.lock().map(|f| f.len()).unwrap_or(0);

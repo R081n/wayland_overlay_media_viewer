@@ -1,6 +1,7 @@
 use bevy::{asset::RenderAssetUsages, prelude::*, render::render_resource::Extent3d};
 use image::DynamicImage;
 use std::{
+    ops::DerefMut,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -24,11 +25,13 @@ pub enum VideoState {
 pub struct VideoPlayer {
     pub state: VideoState,
     pub timer: Arc<Mutex<Timer>>,
-    pub id: Option<Entity>,
-    pub width: f32,
-    pub height: f32,
     pub uri: String,
     pub pipeline: Option<FfmpegPlayer>,
+}
+
+#[derive(Component)]
+pub struct VideoTarget {
+    pub handle: Handle<Image>,
 }
 
 impl VideoPlayer {
@@ -69,8 +72,10 @@ impl Plugin for VideoPlugin {
 
 fn handle_playing_state(
     video_player: &mut VideoPlayer,
-    image_handle: &mut ImageNode,
+    image_handle: &mut VideoTarget,
     images: &mut Assets<Image>,
+    material: &MeshMaterial3d<StandardMaterial>,
+    mut materials: &mut Assets<StandardMaterial>,
     time: &Res<Time>,
 ) {
     if let Ok(mut player_time) = video_player.timer.lock() {
@@ -86,12 +91,18 @@ fn handle_playing_state(
                         if let Some(rbg_data) =
                             image::RgbaImage::from_raw(data.width, data.height, data.data)
                         {
-                            let canvas = Image::from_dynamic(
+                            let canvas: Image = Image::from_dynamic(
                                 DynamicImage::ImageRgba8(rbg_data),
-                                true,
+                                false,
                                 RenderAssetUsages::default(),
                             );
-                            image_handle.image = images.add(canvas);
+
+                            // must touch this to trigger update
+                            let mut mat = materials.get_mut(material.id()).unwrap();
+                            _ = mat.deref_mut();
+
+                            let mut old = images.get_mut(image_handle.handle.id()).unwrap();
+                            *old = canvas;
                             if let Ok(mut pts) = ref_pipeline.previous_pts.lock() {
                                 // Handle first frame: initialize previous_pts
                                 if *pts == 0 {
@@ -128,21 +139,30 @@ fn initialize_video_player(video_player: &mut VideoPlayer) {
 }
 
 pub fn render_video_frame(
-    mut query: Query<(&mut VideoPlayer, &mut ImageNode)>,
+    mut query: Query<(
+        &mut VideoPlayer,
+        &mut VideoTarget,
+        &MeshMaterial3d<StandardMaterial>,
+    )>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
     time: Res<Time>,
 ) {
-    for (mut video_player, mut image_handle) in query.iter_mut() {
+    for (mut video_player, mut image_handle, material) in query.iter_mut() {
         match video_player.state {
-            VideoState::Playing => {
-                handle_playing_state(&mut video_player, &mut image_handle, &mut images, &time)
-            }
+            VideoState::Playing => handle_playing_state(
+                &mut video_player,
+                &mut image_handle,
+                &mut images,
+                &material,
+                &mut materials,
+                &time,
+            ),
             VideoState::Init => {
-                if video_player.id.is_some() {
-                    // println!("[DEBUG] State: Init -> Ready, initializing video player");
-                    video_player.state = VideoState::Ready;
-                    initialize_video_player(&mut video_player);
-                }
+                // println!("[DEBUG] State: Init -> Ready, initializing video player");
+
+                video_player.state = VideoState::Ready;
+                initialize_video_player(&mut video_player);
             }
             VideoState::Start => {
                 // println!("[DEBUG] State: Start, checking if ready...");
@@ -203,7 +223,7 @@ pub fn render_video_frame(
 pub fn insert_video_component(
     mut images: ResMut<Assets<Image>>,
     default_size: Vec2,
-) -> impl Bundle {
+) -> (impl Bundle, Handle<Image>) {
     let mut canvas = Image::from_dynamic(
         DynamicImage::new_rgb8(500, 500),
         true,
@@ -216,11 +236,9 @@ pub fn insert_video_component(
     });
     let image_handle = images.add(canvas);
     (
-        ImageNode::new(image_handle),
-        Node {
-            width: Val::Px(default_size.x),
-            height: Val::Px(default_size.y),
-            ..Default::default()
+        VideoTarget {
+            handle: image_handle.clone(),
         },
+        image_handle,
     )
 }

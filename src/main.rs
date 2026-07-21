@@ -12,7 +12,7 @@ use bevy::{
 };
 use wayland_overlay_media_viewer::{
     spawner::{ObjectMessage, PopupImage, PopupPlugin},
-    videos::plugin::{insert_video_component, VideoPlayer, VideoPlugin, VideoState},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoPlugin, VideoState, VideoTarget},
     WallpaperTargetMonitor, WindowOverlayPlugin,
 };
 
@@ -91,6 +91,8 @@ fn setup(
         ])),
     ];
 
+    let rectangle = meshes.add(Rectangle::from_size(Vec2::ONE));
+
     let extrusions = [
         meshes.add(Extrusion::new(Rectangle::default(), 1.)),
         meshes.add(Extrusion::new(Capsule2d::default(), 1.)),
@@ -123,16 +125,23 @@ fn setup(
         uri: "/home/robink/Downloads/Big_Buck_Bunny_1080_10s_5MB.mp4".to_string(),
         state: VideoState::Start,
         timer: Arc::new(Mutex::new(Timer::from_seconds(0.001, TimerMode::Repeating))),
-        width: 7.0,
-        height: 4.0,
-        id: None,
         pipeline: None,
     };
 
+    let (component, handle) = insert_video_component(images, Vec2::new(1.0, 2.0));
+
     commands
         .spawn((
-            insert_video_component(images, Vec2::new(1.0, 2.0)),
-            Transform::from_translation(Vec3::new(3., 4., 0.)),
+            component,
+            Transform::from_translation(Vec3::new(5., 4., 0.)).with_scale(Vec3::splat(6.)),
+            Mesh3d(rectangle.clone()),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                unlit: true,
+                base_color_texture: Some(handle),
+                base_color: Color::WHITE,
+                alpha_mode: AlphaMode::Blend,
+                ..default()
+            })),
         ))
         .insert(video_player);
 
