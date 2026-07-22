@@ -23,6 +23,7 @@ ffmpeg-next = "8.0"
 cpal = "0.15"
 image = "0.25"
 ringbuf = "0.4"
+bevy_framepace = "0.22.0"
 
 [dependencies.bevy]
 version = "0.19"

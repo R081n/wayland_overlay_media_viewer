@@ -1,6 +1,14 @@
-use std::{f32::consts::PI, path::PathBuf};
+use std::{
+    f32::consts::PI,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
-use crate::position::{PopupPosition, PIXELS_PER_METER};
+use crate::{
+    lifecycle,
+    position::{PopupPosition, PIXELS_PER_METER},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
+};
 use bevy::{
     asset::{LoadState, UntypedAssetId},
     platform::collections::HashMap,
@@ -31,6 +39,7 @@ pub enum PopupInteraction {
 #[derive(Debug, Clone)]
 pub enum PopupAnimation {
     None,
+    SlideFadeIn,
 }
 
 #[derive(Debug, Clone)]
@@ -51,7 +60,16 @@ impl Plugin for PopupPlugin {
             .add_message::<ObjectMessage>()
             .insert_resource(DefaultMeshes::default())
             .add_systems(Startup, init_rect_mesh)
-            .add_systems(Update, (preload_asset, spawn_object).chain());
+            .add_systems(
+                Update,
+                (
+                    preload_asset,
+                    spawn_object,
+                    spawn_videos,
+                    wait_for_video_to_load,
+                )
+                    .chain(),
+            );
     }
 }
 
@@ -78,7 +96,9 @@ fn preload_asset(
     for new in new.read() {
         let handle = match &new.kind {
             ObjectType::Image(popup_image) => assets.load::<Image>(&popup_image.uri).untyped(),
-            ObjectType::Video(popup_video) => todo!(),
+
+            // Handeled differently
+            ObjectType::Video(popup_video) => continue,
         };
 
         pendnig
@@ -110,7 +130,7 @@ fn spawn_object(
         .extract_if(|id, _| server.is_loaded_with_dependencies(id))
     {
         for msg in pending {
-            let mut common = match msg.kind {
+            let mut common = match &msg.kind {
                 ObjectType::Image(popup_image) => {
                     let Ok(asset) = id.clone().try_typed::<Image>() else {
                         continue;
@@ -133,27 +153,108 @@ fn spawn_object(
                             / PIXELS_PER_METER,
                     }
                 }
-                ObjectType::Video(popup_video) => todo!(),
+                // Not handled here
+                ObjectType::Video(_) => continue,
             };
 
-            match msg.position {
-                PopupPosition::Global(vec3) => {
-                    common
-                        .commands
-                        .insert(Transform::from_translation(vec3).with_scale(common.scale));
-                }
-                PopupPosition::SceenSpace(_, vec2) => todo!(),
-                PopupPosition::Random => todo!(),
-            }
+            lifecycle::insert_components(&mut common.commands, msg);
+
+            common
+                .commands
+                .entry::<Transform>()
+                .or_default()
+                .and_modify(move |mut t| *t = t.with_scale(common.scale));
         }
     }
 
-    for (id, pending) in pending.pending.extract_if(|id, _| {
+    for (_, _) in pending.pending.extract_if(|id, _| {
         if let LoadState::Failed(failed) = server.load_state(id) {
-            eprintln!("Faild to load asset {:?}", failed);
+            error!("Faild to load asset {:?}", failed);
             true
         } else {
             false
         }
     }) {}
+}
+
+#[derive(Component)]
+struct VideoDeferredObjectMessage(ObjectMessage);
+
+fn spawn_videos(
+    mut commands: Commands,
+    mut assets: ResMut<AssetServer>,
+    mut new: MessageReader<ObjectMessage>,
+    mut pendnig: ResMut<PendingAssets>,
+    mut images: ResMut<Assets<Image>>,
+    mut default_meshes: Res<DefaultMeshes>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for new in new.read() {
+        let ObjectType::Video(video) = &new.kind else {
+            continue;
+        };
+
+        let video_player = VideoPlayer {
+            uri: video.uri.clone(),
+            state: VideoState::Start,
+            timer: Arc::new(Mutex::new(Timer::from_seconds(0.001, TimerMode::Repeating))),
+            pipeline: None,
+            played_frames: 0,
+        };
+
+        let (component, handle) = insert_video_component(&mut images, Vec2::new(1.0, 2.0));
+
+        commands
+            .spawn((
+                component,
+                Mesh3d(default_meshes.rect.clone()),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    unlit: true,
+                    base_color_texture: Some(handle),
+                    base_color: Color::WHITE,
+                    alpha_mode: AlphaMode::Blend,
+                    ..default()
+                })),
+                Visibility::Visible,
+                VideoDeferredObjectMessage(new.clone()),
+            ))
+            .insert(video_player);
+    }
+}
+
+fn wait_for_video_to_load(
+    mut commands: Commands,
+    mut videos: Query<(
+        Entity,
+        &VideoPlayer,
+        &mut Visibility,
+        &VideoDeferredObjectMessage,
+        &VideoTarget,
+    )>,
+    images: Res<Assets<Image>>,
+) -> Result<(), BevyError> {
+    for (id, player, mut vis, msg, target) in videos.iter_mut() {
+        if player.played_frames == 0 {
+            continue;
+        }
+
+        let msg = msg.0.clone();
+
+        *vis = Visibility::Visible;
+
+        let mut commands = commands.entity(id);
+        commands.remove::<VideoDeferredObjectMessage>();
+        lifecycle::insert_components(&mut commands, msg);
+
+        let target = images.get(target.handle.id()).unwrap();
+
+        let scale = Vec3::new(target.width() as f32, target.height() as f32, 0.) / PIXELS_PER_METER;
+
+        commands
+            .entry::<Transform>()
+            .or_default()
+            .and_modify(move |mut t| *t = t.with_scale(scale));
+    }
+
+    Ok(())
 }

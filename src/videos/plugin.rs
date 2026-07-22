@@ -27,6 +27,7 @@ pub struct VideoPlayer {
     pub timer: Arc<Mutex<Timer>>,
     pub uri: String,
     pub pipeline: Option<FfmpegPlayer>,
+    pub played_frames: u64,
 }
 
 #[derive(Component)]
@@ -75,7 +76,7 @@ fn handle_playing_state(
     image_handle: &mut VideoTarget,
     images: &mut Assets<Image>,
     material: &MeshMaterial3d<StandardMaterial>,
-    mut materials: &mut Assets<StandardMaterial>,
+    materials: &mut Assets<StandardMaterial>,
     time: &Res<Time>,
 ) {
     if let Ok(mut player_time) = video_player.timer.lock() {
@@ -100,6 +101,7 @@ fn handle_playing_state(
                             // must touch this to trigger update
                             let mut mat = materials.get_mut(material.id()).unwrap();
                             _ = mat.deref_mut();
+                            video_player.played_frames += 1;
 
                             let mut old = images.get_mut(image_handle.handle.id()).unwrap();
                             *old = canvas;
@@ -221,7 +223,7 @@ pub fn render_video_frame(
 }
 
 pub fn insert_video_component(
-    mut images: ResMut<Assets<Image>>,
+    images: &mut Assets<Image>,
     default_size: Vec2,
 ) -> (impl Bundle, Handle<Image>) {
     let mut canvas = Image::from_dynamic(

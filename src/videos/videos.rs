@@ -53,6 +53,7 @@ pub struct FfmpegPlayer {
     pub is_playing: Arc<AtomicBool>,
     pub should_stop: Arc<AtomicBool>,
     pub is_ready: Arc<AtomicBool>,
+    pub faulted: Arc<AtomicBool>,
 
     uri: String,
 }
@@ -70,6 +71,7 @@ impl Clone for FfmpegPlayer {
             should_stop: Arc::clone(&self.should_stop),
             is_ready: Arc::clone(&self.is_ready),
             uri: self.uri.clone(),
+            faulted: Arc::clone(&self.faulted),
         }
     }
 }
@@ -88,6 +90,7 @@ impl FfmpegPlayer {
             is_playing: Arc::new(AtomicBool::new(false)),
             should_stop: Arc::new(AtomicBool::new(false)),
             is_ready: Arc::new(AtomicBool::new(false)),
+            faulted: Arc::new(AtomicBool::new(false)),
             uri: uri.to_string(),
         }
     }
@@ -116,6 +119,7 @@ impl FfmpegPlayer {
         let should_stop = Arc::clone(&self.should_stop);
         let is_ready = Arc::clone(&self.is_ready);
         let duration = Arc::clone(&self.duration);
+        let faulted = self.faulted.clone();
         let uri = self.uri.clone();
 
         thread::spawn(move || {
@@ -130,6 +134,7 @@ impl FfmpegPlayer {
                 duration,
             ) {
                 eprintln!("Decode error: {}", e);
+                faulted.store(true, Ordering::Relaxed);
             }
         });
     }

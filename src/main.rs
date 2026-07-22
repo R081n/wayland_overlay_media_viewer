@@ -3,15 +3,20 @@
 use std::{
     f32::consts::PI,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use bevy::{
     asset::{io::web::WebAssetPlugin, RenderAssetUsages},
     prelude::*,
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
+    render::{
+        pipelined_rendering::PipelinedRenderingPlugin,
+        render_resource::{Extent3d, TextureDimension, TextureFormat},
+    },
 };
+use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use wayland_overlay_media_viewer::{
-    spawner::{ObjectMessage, PopupImage, PopupPlugin},
+    spawner::{ObjectMessage, PopupImage, PopupPlugin, PopupVideo},
     videos::plugin::{insert_video_component, VideoPlayer, VideoPlugin, VideoState, VideoTarget},
     WallpaperTargetMonitor, WindowOverlayPlugin,
 };
@@ -37,12 +42,14 @@ fn main() {
                 silence_startup_warning: true,
             })
             .set(window_plugin)
+            .disable::<PipelinedRenderingPlugin>()
             .set(AssetPlugin {
                 unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                 ..Default::default()
             }),
         PopupPlugin,
         VideoPlugin,
+        FramepacePlugin,
     ));
 
     app.add_plugins(WindowOverlayPlugin {
@@ -67,7 +74,9 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut framepace: ResMut<FramepaceSettings>,
 ) {
+    framepace.limiter = bevy_framepace::Limiter::Manual(Duration::from_secs_f64(1.0 / 60.));
     let debug_material = materials.add(StandardMaterial {
         base_color_texture: Some(images.add(uv_debug_texture())),
         ..default()
@@ -119,32 +128,6 @@ fn setup(
         ));
     }
 
-    //"https://video.blender.org/w/4pSeQCu9XXz9wWMh5gTNMf"
-
-    let video_player = VideoPlayer {
-        uri: "/home/robink/Downloads/Big_Buck_Bunny_1080_10s_5MB.mp4".to_string(),
-        state: VideoState::Start,
-        timer: Arc::new(Mutex::new(Timer::from_seconds(0.001, TimerMode::Repeating))),
-        pipeline: None,
-    };
-
-    let (component, handle) = insert_video_component(images, Vec2::new(1.0, 2.0));
-
-    commands
-        .spawn((
-            component,
-            Transform::from_translation(Vec3::new(5., 4., 0.)).with_scale(Vec3::splat(6.)),
-            Mesh3d(rectangle.clone()),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                unlit: true,
-                base_color_texture: Some(handle),
-                base_color: Color::WHITE,
-                alpha_mode: AlphaMode::Blend,
-                ..default()
-            })),
-        ))
-        .insert(video_player);
-
     let num_extrusions = extrusions.len();
 
     for (i, shape) in extrusions.into_iter().enumerate() {
@@ -176,9 +159,20 @@ fn setup(
             uri: "/home/robink/Pictures/Screenshot_20220203_103901.png".to_owned(),
         }),
         position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
-            14., 7., 0.,
+            45., 7., -20.,
         )),
         popup_animation: wayland_overlay_media_viewer::spawner::PopupAnimation::None,
+        behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
+    });
+
+    commands.write_message(ObjectMessage {
+        kind: wayland_overlay_media_viewer::spawner::ObjectType::Video(PopupVideo {
+            uri: "/home/robink/Downloads/Big_Buck_Bunny_1080_10s_5MB.mp4".to_owned(),
+        }),
+        position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
+            37., 7., 0.0,
+        )),
+        popup_animation: wayland_overlay_media_viewer::spawner::PopupAnimation::SlideFadeIn,
         behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
     });
 
