@@ -81,48 +81,47 @@ fn handle_playing_state(
 ) {
     if let Ok(mut player_time) = video_player.timer.lock()
         && player_time.tick(time.delta()).just_finished()
-            && let Some(ref_pipeline) = video_player.pipeline.as_ref()
-                && let Ok(mut frames) = ref_pipeline.frame.lock()
-                    && let Some(data) = frames.pop_front() {
-                        // Update current position based on the frame being rendered
-                        if let Ok(mut pos) = ref_pipeline.current_position.lock() {
-                            *pos = data.position_secs;
-                        }
+        && let Some(ref_pipeline) = video_player.pipeline.as_ref()
+        && let Ok(mut frames) = ref_pipeline.frame.lock()
+        && let Some(data) = frames.pop_front()
+    {
+        // Update current position based on the frame being rendered
+        if let Ok(mut pos) = ref_pipeline.current_position.lock() {
+            *pos = data.position_secs;
+        }
 
-                        if let Some(rbg_data) =
-                            image::RgbaImage::from_raw(data.width, data.height, data.data)
-                        {
-                            let canvas: Image = Image::from_dynamic(
-                                DynamicImage::ImageRgba8(rbg_data),
-                                false,
-                                RenderAssetUsages::default(),
-                            );
+        if let Some(rbg_data) = image::RgbaImage::from_raw(data.width, data.height, data.data) {
+            let canvas: Image = Image::from_dynamic(
+                DynamicImage::ImageRgba8(rbg_data),
+                false,
+                RenderAssetUsages::default(),
+            );
 
-                            // must touch this to trigger update
-                            let mut mat = materials.get_mut(material.id()).unwrap();
-                            _ = mat.deref_mut();
-                            video_player.played_frames += 1;
+            // must touch this to trigger update
+            let mut mat = materials.get_mut(material.id()).unwrap();
+            _ = mat.deref_mut();
+            video_player.played_frames += 1;
 
-                            let mut old = images.get_mut(image_handle.handle.id()).unwrap();
-                            *old = canvas;
-                            if let Ok(mut pts) = ref_pipeline.previous_pts.lock() {
-                                // Handle first frame: initialize previous_pts
-                                if *pts == 0 {
-                                    *pts = data.pts;
-                                    player_time.set_duration(Duration::from_millis(33));
-                                // ~30fps default
-                                } else if data.pts > *pts {
-                                    let dt = (data.pts - *pts) / 1_000_000;
-                                    // Clamp dt to reasonable range (1ms - 100ms)
-                                    let dt = dt.max(1).min(100);
-                                    player_time.set_duration(Duration::from_millis(dt));
-                                    *pts = data.pts;
-                                } else {
-                                    *pts = data.pts;
-                                }
-                            }
-                        }
-                    }
+            let mut old = images.get_mut(image_handle.handle.id()).unwrap();
+            *old = canvas;
+            if let Ok(mut pts) = ref_pipeline.previous_pts.lock() {
+                // Handle first frame: initialize previous_pts
+                if *pts == 0 {
+                    *pts = data.pts;
+                    player_time.set_duration(Duration::from_millis(33));
+                // ~30fps default
+                } else if data.pts > *pts {
+                    let dt = (data.pts - *pts) / 1_000_000;
+                    // Clamp dt to reasonable range (1ms - 100ms)
+                    let dt = dt.max(1).min(100);
+                    player_time.set_duration(Duration::from_millis(dt));
+                    *pts = data.pts;
+                } else {
+                    *pts = data.pts;
+                }
+            }
+        }
+    }
 }
 
 fn initialize_video_player(video_player: &mut VideoPlayer) {

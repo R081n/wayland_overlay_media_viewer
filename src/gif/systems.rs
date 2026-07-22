@@ -8,22 +8,25 @@ use bevy::{
 
 use crate::gif::{
     Gif3d, GifNode,
-    {messages::GifDespawnMessage, Gif, GifAsset, GifDespawn, GifPlayer},
+    {Gif, GifAsset, GifDespawn, GifPlayer, messages::GifDespawnMessage},
 };
 
+#[derive(Component)]
+pub(crate) struct GifInitialized;
 /// Initialize the [Gif]'s [Sprite] / [GifNode]'s [ImageNode] / [Gif3d]'s [MeshMaterial3d] with the first image of the sequence.
 pub(crate) fn initialize_gifs(
+    mut commands: Commands,
     mut gifs_q: Query<(
+        Entity,
         Option<(&Gif, &mut Sprite)>,
         Option<(&GifNode, &mut ImageNode)>,
         Option<(&Gif3d, &mut MeshMaterial3d<StandardMaterial>)>,
         &mut GifPlayer,
-    )>,
+    ), Without<GifInitialized>>,
     mut gifs: ResMut<Assets<GifAsset>>,
-    asset_server: ResMut<AssetServer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    for (gif_option, gifnode_option, gif3d_option, mut player) in gifs_q.iter_mut() {
+    for (id, gif_option, gifnode_option, gif3d_option, mut player) in gifs_q.iter_mut() {
         let handle = if let Some((gif, _)) = gif_option {
             gif.handle.clone()
         } else if let Some((gif_node, _)) = gifnode_option {
@@ -42,27 +45,7 @@ pub(crate) fn initialize_gifs(
                 frame_end,
             } = asset.into_inner();
 
-            // if let Some(asset) = gifs.get_mut(&handle) {
-            if !handles.is_empty() {
-                // Already loaded, continue
-                continue;
-            }
-            // Build all frames and store them
-            for frame in frames.iter() {
-                let image = Image::new_fill(
-                    Extent3d {
-                        width: frame.width,
-                        height: frame.height,
-                        depth_or_array_layers: 1,
-                    },
-                    TextureDimension::D2,
-                    &frame.rgba,
-                    TextureFormat::Rgba8UnormSrgb,
-                    RenderAssetUsages::all(),
-                );
-                let handle = asset_server.add(image);
-                handles.push(handle);
-            }
+        
             // Get first frame and load it to the sprite
             let _frame = frames.first().unwrap();
             let handle = handles.first().unwrap();
@@ -77,11 +60,12 @@ pub(crate) fn initialize_gifs(
                 image_node.image = handle.clone();
             }
             if let Some((_, mm)) = gif3d_option
-                && let Some(asset) = materials.get_mut(&mm.0) {
-                    let mat = asset.into_inner();
-                    mat.base_color_texture = Some(handle.clone());
-                    mat.alpha_mode = AlphaMode::Blend;
-                }
+                && let Some(asset) = materials.get_mut(&mm.0)
+            {
+                let mat = asset.into_inner();
+                mat.base_color_texture = Some(handle.clone());
+                mat.alpha_mode = AlphaMode::Blend;
+            }
 
             // initialize timer
             player.current = 0; // first frame
@@ -90,6 +74,8 @@ pub(crate) fn initialize_gifs(
                 TimerMode::Repeating,
             );
             player.remaining = *times;
+
+            commands.entity(id).insert(GifInitialized);
         }
     }
 }
@@ -154,11 +140,12 @@ pub(crate) fn animate_gifs(
                     image_node.image = handle.clone();
                 }
                 if let Some((_, mm)) = gif3d_option
-                    && let Some(asset) = materials.get_mut(&mm.0) {
-                        let mat = asset.into_inner();
-                        mat.base_color_texture = Some(handle.clone());
-                        mat.alpha_mode = AlphaMode::Blend;
-                    }
+                    && let Some(asset) = materials.get_mut(&mm.0)
+                {
+                    let mat = asset.into_inner();
+                    mat.base_color_texture = Some(handle.clone());
+                    mat.alpha_mode = AlphaMode::Blend;
+                }
             }
         }
     }

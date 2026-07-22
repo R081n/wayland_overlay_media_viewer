@@ -6,14 +6,10 @@ use std::{
 use crate::gif::{Gif3d, GifAsset};
 use crate::{
     lifecycle,
-    position::{PopupPosition, PIXELS_PER_METER},
-    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
+    position::{PIXELS_PER_METER, PopupPosition},
+    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
 };
-use bevy::{
-    asset::LoadState,
-    platform::collections::HashMap,
-    prelude::*,
-};
+use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 
 #[derive(Message, Clone)]
 pub struct ObjectMessage {
@@ -151,6 +147,8 @@ fn spawn_object(
         .extract_if(|id, _| server.is_loaded_with_dependencies(id))
     {
         for msg in pending {
+            dbg!("spawn");
+
             let mut common = match &msg.kind {
                 ObjectType::Image(_) => {
                     if let Ok(asset) = id.clone().try_typed::<Image>() {
@@ -160,7 +158,7 @@ fn spawn_object(
                             commands: commands.spawn((
                                 Mesh3d(default_meshes.rect.clone()),
                                 MeshMaterial3d(materials.add(StandardMaterial {
-                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 0.)),
+                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 1.)),
                                     unlit: true,
                                     base_color_texture: Some(asset),
                                     alpha_mode: AlphaMode::Blend,
@@ -173,9 +171,11 @@ fn spawn_object(
                     } else if let Ok(asset) = id.clone().try_typed::<GifAsset>() {
                         let image = gifs.get(&asset).expect("asset to exist");
                         let scale = image
-                            .frames.first()
+                            .frames
+                            .first()
                             .map(|i| Vec2::new(i.width as f32, i.height as f32))
                             .unwrap_or(Vec2::splat(100.));
+
                         CommonProps {
                             commands: commands.spawn((
                                 Gif3d {
@@ -183,7 +183,7 @@ fn spawn_object(
                                 },
                                 Mesh3d(default_meshes.rect.clone()),
                                 MeshMaterial3d(materials.add(StandardMaterial {
-                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 0.)),
+                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 1.)),
                                     unlit: true,
                                     alpha_mode: AlphaMode::Blend,
                                     ..default()

@@ -29,3 +29,7 @@ thiserror = "2.0.17"
 [dependencies.bevy]
 version = "0.19"
 features = ["http", "https", "jpeg", "png", "webp", "gif"]
+
+[profile.dev]
+opt-level = 2
+debug = true

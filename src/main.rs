@@ -1,13 +1,10 @@
 // https://github.com/bevyengine/bevy/blob/v0.17.2/examples/3d/3d_shapes.rs
 
-use std::{
-    f32::consts::PI,
-    time::Duration,
-};
+use std::{f32::consts::PI, time::Duration};
 
 use bevy::{
     app::TerminalCtrlCHandlerPlugin,
-    asset::{io::web::WebAssetPlugin, RenderAssetUsages},
+    asset::{RenderAssetUsages, io::web::WebAssetPlugin},
     prelude::*,
     render::{
         pipelined_rendering::PipelinedRenderingPlugin,
@@ -16,11 +13,11 @@ use bevy::{
 };
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use wayland_overlay_media_viewer::{
+    WallpaperTargetMonitor, WindowOverlayPlugin,
     gif::GifPlugin,
     lifecycle::LiveCyclePlugin,
     spawner::{ObjectMessage, PopupImage, PopupPlugin},
     videos::plugin::VideoPlugin,
-    WallpaperTargetMonitor, WindowOverlayPlugin,
 };
 
 fn main() {
@@ -159,17 +156,40 @@ fn setup(
         Transform::from_translation(Vec3::new(20., 60., 0.)),
     ));
 
-    commands.write_message(ObjectMessage {
-        kind: wayland_overlay_media_viewer::spawner::ObjectType::Image(PopupImage {
-            uri: "".to_owned(),
-        }),
-        position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
-            45., 7., 0.0,
-        )),
-        popup_animation: wayland_overlay_media_viewer::spawner::PopupAnimation::None,
-        behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
-        opacity: 1.0,
-    });
+    for (id, l) in [
+        "/home/robink/Downloads/916af9c0bd4af6c8131a19e5d841d7e4.webp",
+        "/home/robink/Downloads/9c92ab83276d3ef3c16518f2b779abc4.webp",
+        "/home/robink/Downloads/4e943391859cdcab9ed52c1b032c2a0e.webp",
+        "/home/robink/Downloads/f1c2c4e7bfd196fb7dc1a51042e7710d.webp",
+        "/home/robink/Downloads/c16e0d702b3136151fef60e9b20038ad.webp",
+        "/home/robink/Downloads/2acec51f58722b13ebc278b9923a1906.webp",
+    ]
+    .iter()
+    .copied()
+    .enumerate()
+    {
+        for i in 0..2 {
+            commands
+                .delayed()
+                .secs(id as f32 + i as f32 * 3.)
+                .write_message(ObjectMessage {
+                    kind: wayland_overlay_media_viewer::spawner::ObjectType::Image(PopupImage {
+                        uri: l.to_owned(),
+                    }),
+                    position: wayland_overlay_media_viewer::position::PopupPosition::Global(
+                        Vec3::new(
+                            10.0 + id as f32 * 4.,
+                            i as f32 * 8. + 1.,
+                            0.001 * id as f32 + 0.01 * i as f32,
+                        ),
+                    ),
+                    popup_animation:
+                        wayland_overlay_media_viewer::spawner::PopupAnimation::SlideFadeIn,
+                    behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
+                    opacity: 0.4,
+                });
+        }
+    }
 
     // commands.delayed().secs(3.0).write_message(ObjectMessage {
     //     kind: wayland_overlay_media_viewer::spawner::ObjectType::Video(PopupVideo {

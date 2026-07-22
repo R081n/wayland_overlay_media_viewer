@@ -1,6 +1,4 @@
-
 use bevy::prelude::*;
-
 
 pub struct ImagePlugin {}
 

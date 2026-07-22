@@ -1,15 +1,17 @@
-use std::time::Duration;
+use std::{convert::Infallible, time::Duration};
 
 use bevy::{
-    asset::{io::Reader, AssetLoader, LoadContext},
+    asset::{io::Reader, AssetLoader, LoadContext, RenderAssetUsages},
     prelude::*,
 };
 use image::{
     codecs::{gif::GifDecoder, webp::WebPDecoder},
+    imageops::resize,
     metadata::LoopCount,
     AnimationDecoder as _, ImageError,
 };
 use thiserror::Error;
+use wgpu::{Extent3d, TextureDimension, TextureFormat};
 
 /// Entity used to spawn a [Sprite] with an animated texture.
 /// This is the main and might be the only struct you will use from this crate.
@@ -102,7 +104,7 @@ impl AssetLoader for AnimationImageLoader {
         &self,
         reader: &mut dyn Reader,
         _settings: &Self::Settings,
-        _load_context: &mut LoadContext<'_>,
+        load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
 
@@ -136,6 +138,7 @@ impl AssetLoader for AnimationImageLoader {
         for frame_result in frames_iterator {
             let frame = frame_result?;
 
+            dbg!("frame");
             let duration = Duration::from(frame.delay());
 
             current_time += duration.as_secs_f64();
@@ -143,9 +146,23 @@ impl AssetLoader for AnimationImageLoader {
 
             // Convert the automatically composited underlying frame directly to an RGBA8 buffer
             let image_buffer = frame.into_buffer();
-            let width = image_buffer.width();
-            let height = image_buffer.height();
-            let rgba = image_buffer.into_raw();
+            let mut width = image_buffer.width();
+            let mut height = image_buffer.height();
+
+            let rgba = if width > 500 || height > 500 {
+                let fac = u32::max(width, height) / 500;
+                width /= fac;
+                height /= fac;
+                resize(
+                    &image_buffer,
+                    width,
+                    height,
+                    image::imageops::FilterType::Lanczos3,
+                )
+                .into_raw()
+            } else {
+                image_buffer.into_raw()
+            };
 
             frames.push(GifFrame {
                 width,
@@ -155,16 +172,38 @@ impl AssetLoader for AnimationImageLoader {
             });
         }
 
+        let mut handles = Vec::new();
+
+        // Build all frames and store them
+        for (id, frame) in frames.iter().enumerate() {
+            let image = Image::new_fill(
+                Extent3d {
+                    width: frame.width,
+                    height: frame.height,
+                    depth_or_array_layers: 1,
+                },
+                TextureDimension::D2,
+                &frame.rgba,
+                TextureFormat::Rgba8UnormSrgb,
+                RenderAssetUsages::all(),
+            );
+            let handle = load_context
+                .labeled_asset_scope::<_, Infallible>(format!("Frame: {id}"), |_| Ok(image))
+                .unwrap();
+            handles.push(handle);
+        }
+
         // Create the GifAsset and set it as the default loaded asset
         let asset = GifAsset {
             frames,
-            handles: vec![], // will be loaded in `initialize_gifs`
+            handles,
             times: match loop_count {
                 LoopCount::Infinite => None,
                 LoopCount::Finite(count) => Some(count.get()),
             },
             frame_end,
         };
+
         Ok(asset)
     }
 

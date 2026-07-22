@@ -1,19 +1,19 @@
 use std::{
     collections::VecDeque,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
 };
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::{traits::*, HeapRb};
+use ringbuf::{HeapRb, traits::*};
 
 extern crate ffmpeg_next as ffmpeg;
 
 use ffmpeg::{
-    format::{input, Pixel},
+    format::{Pixel, input},
     media::Type,
     software::scaling::{context::Context as ScalingContext, flag::Flags},
     util::frame::video::Video as VideoFrame,
@@ -328,7 +328,7 @@ impl FfmpegPlayer {
         let mut frame_count = 0u64;
         let mut prebuffering = true;
         const PREBUFFER_FRAMES: usize = 30; // Prebuffer ~1 second of video
-                                            // Prebuffer 0.5 second of audio for smoother playback
+        // Prebuffer 0.5 second of audio for smoother playback
         let prebuffer_audio_samples =
             (target_sample_rate as usize) * (target_channels as usize) / 2;
         let mut audio_samples_pushed: usize = 0;
@@ -439,10 +439,11 @@ impl FfmpegPlayer {
                             // Wait if frame queue is full to maintain sync
                             loop {
                                 if let Ok(mut frames) = frame_queue.lock()
-                                    && frames.len() < 100 {
-                                        frames.push_back(video_info);
-                                        break;
-                                    }
+                                    && frames.len() < 100
+                                {
+                                    frames.push_back(video_info);
+                                    break;
+                                }
                                 // Queue full, wait a bit
                                 thread::sleep(std::time::Duration::from_millis(5));
                                 if should_stop.load(Ordering::Relaxed) {
@@ -454,95 +455,94 @@ impl FfmpegPlayer {
                 }
             } else if Some(stream.index()) == audio_stream_index
                 && let Some(ref mut decoder) = audio_decoder
-                    && let Some(ref mut producer) = audio_producer {
-                        decoder.send_packet(&packet)?;
+                && let Some(ref mut producer) = audio_producer
+            {
+                decoder.send_packet(&packet)?;
 
-                        let mut decoded = ffmpeg::util::frame::audio::Audio::empty();
-                        while decoder.receive_frame(&mut decoded).is_ok() {
-                            // Create resampler based on detected format (convert to F32 packed for cpal)
-                            if resampler.is_none() {
-                                let target_layout = if target_channels == 1 {
-                                    ffmpeg::channel_layout::ChannelLayout::MONO
-                                } else {
-                                    ffmpeg::channel_layout::ChannelLayout::STEREO
-                                };
-                                resampler = Some(ffmpeg::software::resampling::Context::get(
-                                    decoded.format(),
-                                    decoded.channel_layout(),
-                                    decoded.rate(),
-                                    ffmpeg::format::Sample::F32(
-                                        ffmpeg::format::sample::Type::Packed,
-                                    ),
-                                    target_layout,
-                                    target_sample_rate,
-                                )?);
-                                // println!(
-                                //     "[DEBUG] Created resampler: {:?} {} Hz -> F32 packed {} Hz, {} channels",
-                                //     decoded.format(),
-                                //     decoded.rate(),
-                                //     target_sample_rate,
-                                //     target_channels
-                                // );
-                            }
+                let mut decoded = ffmpeg::util::frame::audio::Audio::empty();
+                while decoder.receive_frame(&mut decoded).is_ok() {
+                    // Create resampler based on detected format (convert to F32 packed for cpal)
+                    if resampler.is_none() {
+                        let target_layout = if target_channels == 1 {
+                            ffmpeg::channel_layout::ChannelLayout::MONO
+                        } else {
+                            ffmpeg::channel_layout::ChannelLayout::STEREO
+                        };
+                        resampler = Some(ffmpeg::software::resampling::Context::get(
+                            decoded.format(),
+                            decoded.channel_layout(),
+                            decoded.rate(),
+                            ffmpeg::format::Sample::F32(ffmpeg::format::sample::Type::Packed),
+                            target_layout,
+                            target_sample_rate,
+                        )?);
+                        // println!(
+                        //     "[DEBUG] Created resampler: {:?} {} Hz -> F32 packed {} Hz, {} channels",
+                        //     decoded.format(),
+                        //     decoded.rate(),
+                        //     target_sample_rate,
+                        //     target_channels
+                        // );
+                    }
 
-                            if let Some(ref mut resampler) = resampler {
-                                let mut resampled = ffmpeg::util::frame::audio::Audio::empty();
+                    if let Some(ref mut resampler) = resampler {
+                        let mut resampled = ffmpeg::util::frame::audio::Audio::empty();
 
-                                // Run resampler and collect output
-                                if resampler.run(&decoded, &mut resampled).is_ok()
-                                    && resampled.samples() > 0
-                                {
-                                    // For packed format, samples() returns number of samples per channel
-                                    // Total float samples = samples_per_channel * num_channels
-                                    let samples_per_channel = resampled.samples();
-                                    let total_floats =
-                                        samples_per_channel * target_channels as usize;
+                        // Run resampler and collect output
+                        if resampler.run(&decoded, &mut resampled).is_ok()
+                            && resampled.samples() > 0
+                        {
+                            // For packed format, samples() returns number of samples per channel
+                            // Total float samples = samples_per_channel * num_channels
+                            let samples_per_channel = resampled.samples();
+                            let total_floats = samples_per_channel * target_channels as usize;
 
-                                    // Get raw data and convert to f32 slice
-                                    let data = resampled.data(0);
-                                    let float_data: &[f32] = unsafe {
-                                        std::slice::from_raw_parts(
-                                            data.as_ptr() as *const f32,
-                                            total_floats.min(data.len() / 4),
-                                        )
-                                    };
+                            // Get raw data and convert to f32 slice
+                            let data = resampled.data(0);
+                            let float_data: &[f32] = unsafe {
+                                std::slice::from_raw_parts(
+                                    data.as_ptr() as *const f32,
+                                    total_floats.min(data.len() / 4),
+                                )
+                            };
 
-                                    let samples_to_push = float_data.len();
+                            let samples_to_push = float_data.len();
 
-                                    // Push samples to ring buffer, waiting if full
-                                    let mut pushed = 0;
-                                    while pushed < samples_to_push {
-                                        let remaining = &float_data[pushed..samples_to_push];
-                                        let n = producer.push_slice(remaining);
-                                        pushed += n;
-                                        audio_samples_pushed += n;
+                            // Push samples to ring buffer, waiting if full
+                            let mut pushed = 0;
+                            while pushed < samples_to_push {
+                                let remaining = &float_data[pushed..samples_to_push];
+                                let n = producer.push_slice(remaining);
+                                pushed += n;
+                                audio_samples_pushed += n;
 
-                                        if n == 0 {
-                                            // Buffer full, wait a bit
-                                            thread::sleep(std::time::Duration::from_millis(2));
-                                            if should_stop.load(Ordering::Relaxed) {
-                                                break;
-                                            }
-                                        }
+                                if n == 0 {
+                                    // Buffer full, wait a bit
+                                    thread::sleep(std::time::Duration::from_millis(2));
+                                    if should_stop.load(Ordering::Relaxed) {
+                                        break;
                                     }
                                 }
                             }
                         }
                     }
+                }
+            }
         }
 
         // Flush resampler at end of stream
         if let Some(ref mut resampler) = resampler
-            && let Some(ref mut producer) = audio_producer {
-                let mut flush_frame = ffmpeg::util::frame::audio::Audio::empty();
-                while resampler.flush(&mut flush_frame).is_ok() && flush_frame.samples() > 0 {
-                    let num_samples = flush_frame.samples() * target_channels as usize;
-                    let plane = flush_frame.plane::<f32>(0);
-                    let samples_to_push = num_samples.min(plane.len());
-                    let _ = producer.push_slice(&plane[..samples_to_push]);
-                    flush_frame = ffmpeg::util::frame::audio::Audio::empty();
-                }
+            && let Some(ref mut producer) = audio_producer
+        {
+            let mut flush_frame = ffmpeg::util::frame::audio::Audio::empty();
+            while resampler.flush(&mut flush_frame).is_ok() && flush_frame.samples() > 0 {
+                let num_samples = flush_frame.samples() * target_channels as usize;
+                let plane = flush_frame.plane::<f32>(0);
+                let samples_to_push = num_samples.min(plane.len());
+                let _ = producer.push_slice(&plane[..samples_to_push]);
+                flush_frame = ffmpeg::util::frame::audio::Audio::empty();
             }
+        }
 
         // println!("EOS");
         Ok(())
