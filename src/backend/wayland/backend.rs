@@ -136,7 +136,7 @@ fn wayland_event_system(
                     continue;
                 };
 
-                (*transform, *position) = create_transform(&desc);
+                (*transform, *position) = create_transform(desc);
             }
         }
 

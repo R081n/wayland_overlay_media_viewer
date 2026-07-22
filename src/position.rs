@@ -1,6 +1,6 @@
 use bevy::{
     ecs::component::Component,
-    math::{Rect, Vec2, Vec3, primitives::Rectangle},
+    math::{Rect, Vec2, Vec3},
 };
 
 #[derive(Debug, Clone)]

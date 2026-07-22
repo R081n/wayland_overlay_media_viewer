@@ -79,11 +79,11 @@ fn handle_playing_state(
     materials: &mut Assets<StandardMaterial>,
     time: &Res<Time>,
 ) {
-    if let Ok(mut player_time) = video_player.timer.lock() {
-        if player_time.tick(time.delta()).just_finished() {
-            if let Some(ref_pipeline) = video_player.pipeline.as_ref() {
-                if let Ok(mut frames) = ref_pipeline.frame.lock() {
-                    if let Some(data) = frames.pop_front() {
+    if let Ok(mut player_time) = video_player.timer.lock()
+        && player_time.tick(time.delta()).just_finished()
+            && let Some(ref_pipeline) = video_player.pipeline.as_ref()
+                && let Ok(mut frames) = ref_pipeline.frame.lock()
+                    && let Some(data) = frames.pop_front() {
                         // Update current position based on the frame being rendered
                         if let Ok(mut pos) = ref_pipeline.current_position.lock() {
                             *pos = data.position_secs;
@@ -123,10 +123,6 @@ fn handle_playing_state(
                             }
                         }
                     }
-                }
-            }
-        }
-    }
 }
 
 fn initialize_video_player(video_player: &mut VideoPlayer) {
@@ -156,7 +152,7 @@ pub fn render_video_frame(
                 &mut video_player,
                 &mut image_handle,
                 &mut images,
-                &material,
+                material,
                 &mut materials,
                 &time,
             ),

@@ -43,7 +43,7 @@ pub(crate) fn initialize_gifs(
             } = asset.into_inner();
 
             // if let Some(asset) = gifs.get_mut(&handle) {
-            if handles.len() != 0 {
+            if !handles.is_empty() {
                 // Already loaded, continue
                 continue;
             }
@@ -64,7 +64,7 @@ pub(crate) fn initialize_gifs(
                 handles.push(handle);
             }
             // Get first frame and load it to the sprite
-            let frame = frames.first().unwrap();
+            let _frame = frames.first().unwrap();
             let handle = handles.first().unwrap();
             // unwrap()-ing is fine here, because this is called after `asset_server.load()`,
             // which would panic if there is an issue with the GIF file.
@@ -76,13 +76,12 @@ pub(crate) fn initialize_gifs(
             if let Some((_, mut image_node)) = gifnode_option {
                 image_node.image = handle.clone();
             }
-            if let Some((_, mm)) = gif3d_option {
-                if let Some(asset) = materials.get_mut(&mm.0) {
+            if let Some((_, mm)) = gif3d_option
+                && let Some(asset) = materials.get_mut(&mm.0) {
                     let mat = asset.into_inner();
                     mat.base_color_texture = Some(handle.clone());
                     mat.alpha_mode = AlphaMode::Blend;
                 }
-            }
 
             // initialize timer
             player.current = 0; // first frame
@@ -154,13 +153,12 @@ pub(crate) fn animate_gifs(
                 if let Some((_, mut image_node)) = gifnode_option {
                     image_node.image = handle.clone();
                 }
-                if let Some((_, mm)) = gif3d_option {
-                    if let Some(asset) = materials.get_mut(&mm.0) {
+                if let Some((_, mm)) = gif3d_option
+                    && let Some(asset) = materials.get_mut(&mm.0) {
                         let mat = asset.into_inner();
                         mat.base_color_texture = Some(handle.clone());
                         mat.alpha_mode = AlphaMode::Blend;
                     }
-                }
             }
         }
     }

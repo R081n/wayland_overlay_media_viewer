@@ -262,26 +262,24 @@ impl FfmpegPlayer {
 
         let mut video_decoder = video_stream_index
             .and_then(|idx| ictx.stream(idx))
-            .map(|stream| {
+            .and_then(|stream| {
                 let context =
                     ffmpeg::codec::context::Context::from_parameters(stream.parameters()).ok()?;
                 context.decoder().video().ok()
-            })
-            .flatten();
+            });
 
         let mut audio_decoder = audio_stream_index
             .and_then(|idx| ictx.stream(idx))
-            .map(|stream| {
+            .and_then(|stream| {
                 let context =
                     ffmpeg::codec::context::Context::from_parameters(stream.parameters()).ok()?;
                 context.decoder().audio().ok()
-            })
-            .flatten();
+            });
 
         // Read audio format from the decoder
         let detected_format = if let Some(ref decoder) = audio_decoder {
             let rate = decoder.rate();
-            let channels = decoder.channels() as u16;
+            let channels = decoder.channels();
             // println!(
             //     "[DEBUG] Detected audio format: {} Hz, {} channels, format: {:?}",
             //     rate, channels, decoder.format()
@@ -353,7 +351,7 @@ impl FfmpegPlayer {
                 let audio_ready =
                     audio_samples_pushed >= prebuffer_audio_samples || audio_stream_index.is_none();
 
-                if frame_count % 10 == 0 {
+                if frame_count.is_multiple_of(10) {
                     let _video_len = frame_queue.lock().map(|f| f.len()).unwrap_or(0);
                     // println!("[DEBUG] Prebuffering: video {}/{}, audio {}/{}",
                     //          _video_len, PREBUFFER_FRAMES, audio_samples_pushed, prebuffer_audio_samples);
@@ -440,12 +438,11 @@ impl FfmpegPlayer {
 
                             // Wait if frame queue is full to maintain sync
                             loop {
-                                if let Ok(mut frames) = frame_queue.lock() {
-                                    if frames.len() < 100 {
+                                if let Ok(mut frames) = frame_queue.lock()
+                                    && frames.len() < 100 {
                                         frames.push_back(video_info);
                                         break;
                                     }
-                                }
                                 // Queue full, wait a bit
                                 thread::sleep(std::time::Duration::from_millis(5));
                                 if should_stop.load(Ordering::Relaxed) {
@@ -455,9 +452,9 @@ impl FfmpegPlayer {
                         }
                     }
                 }
-            } else if Some(stream.index()) == audio_stream_index {
-                if let Some(ref mut decoder) = audio_decoder {
-                    if let Some(ref mut producer) = audio_producer {
+            } else if Some(stream.index()) == audio_stream_index
+                && let Some(ref mut decoder) = audio_decoder
+                    && let Some(ref mut producer) = audio_producer {
                         decoder.send_packet(&packet)?;
 
                         let mut decoded = ffmpeg::util::frame::audio::Audio::empty();
@@ -532,13 +529,11 @@ impl FfmpegPlayer {
                             }
                         }
                     }
-                }
-            }
         }
 
         // Flush resampler at end of stream
-        if let Some(ref mut resampler) = resampler {
-            if let Some(ref mut producer) = audio_producer {
+        if let Some(ref mut resampler) = resampler
+            && let Some(ref mut producer) = audio_producer {
                 let mut flush_frame = ffmpeg::util::frame::audio::Audio::empty();
                 while resampler.flush(&mut flush_frame).is_ok() && flush_frame.samples() > 0 {
                     let num_samples = flush_frame.samples() * target_channels as usize;
@@ -548,7 +543,6 @@ impl FfmpegPlayer {
                     flush_frame = ffmpeg::util::frame::audio::Audio::empty();
                 }
             }
-        }
 
         // println!("EOS");
         Ok(())

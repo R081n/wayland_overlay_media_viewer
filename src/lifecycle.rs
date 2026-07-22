@@ -10,7 +10,7 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
         PopupPosition::Global(vec3) => {
             commands.insert(Transform::from_translation(vec3));
         }
-        PopupPosition::SceenSpace(_, vec2) => todo!(),
+        PopupPosition::SceenSpace(_, _vec2) => todo!(),
         PopupPosition::Random => todo!(),
     }
 

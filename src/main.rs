@@ -2,7 +2,6 @@
 
 use std::{
     f32::consts::PI,
-    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -19,8 +18,8 @@ use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use wayland_overlay_media_viewer::{
     gif::GifPlugin,
     lifecycle::LiveCyclePlugin,
-    spawner::{ObjectMessage, PopupImage, PopupPlugin, PopupVideo},
-    videos::plugin::{insert_video_component, VideoPlayer, VideoPlugin, VideoState, VideoTarget},
+    spawner::{ObjectMessage, PopupImage, PopupPlugin},
+    videos::plugin::VideoPlugin,
     WallpaperTargetMonitor, WindowOverlayPlugin,
 };
 
@@ -106,7 +105,7 @@ fn setup(
         ])),
     ];
 
-    let rectangle = meshes.add(Rectangle::from_size(Vec2::ONE));
+    let _rectangle = meshes.add(Rectangle::from_size(Vec2::ONE));
 
     let extrusions = [
         meshes.add(Extrusion::new(Rectangle::default(), 1.)),

@@ -1,6 +1,5 @@
 use std::{
-    f32::consts::PI,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -11,7 +10,7 @@ use crate::{
     videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
 };
 use bevy::{
-    asset::{LoadState, UntypedAssetId},
+    asset::LoadState,
     platform::collections::HashMap,
     prelude::*,
 };
@@ -101,7 +100,7 @@ fn init_rect_mesh(mut meshes: ResMut<Assets<Mesh>>, mut default_meshes: ResMut<D
 }
 
 fn preload_asset(
-    mut assets: ResMut<AssetServer>,
+    assets: ResMut<AssetServer>,
     mut new: MessageReader<ObjectMessage>,
     mut pendnig: ResMut<PendingAssets>,
 ) {
@@ -119,7 +118,7 @@ fn preload_asset(
             }
 
             // Handeled differently
-            ObjectType::Video(popup_video) => continue,
+            ObjectType::Video(_popup_video) => continue,
         };
 
         pendnig
@@ -143,9 +142,9 @@ fn spawn_object(
     mut pending: ResMut<PendingAssets>,
     server: ResMut<AssetServer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut images: ResMut<Assets<Image>>,
-    mut gifs: ResMut<Assets<GifAsset>>,
-    mut default_meshes: Res<DefaultMeshes>,
+    images: ResMut<Assets<Image>>,
+    gifs: ResMut<Assets<GifAsset>>,
+    default_meshes: Res<DefaultMeshes>,
 ) {
     for (id, pending) in pending
         .pending
@@ -174,8 +173,7 @@ fn spawn_object(
                     } else if let Ok(asset) = id.clone().try_typed::<GifAsset>() {
                         let image = gifs.get(&asset).expect("asset to exist");
                         let scale = image
-                            .frames
-                            .get(0)
+                            .frames.first()
                             .map(|i| Vec2::new(i.width as f32, i.height as f32))
                             .unwrap_or(Vec2::splat(100.));
                         CommonProps {
@@ -226,11 +224,11 @@ struct VideoDeferredObjectMessage(ObjectMessage);
 
 fn spawn_videos(
     mut commands: Commands,
-    mut assets: ResMut<AssetServer>,
+    _assets: ResMut<AssetServer>,
     mut new: MessageReader<ObjectMessage>,
-    mut pendnig: ResMut<PendingAssets>,
+    _pendnig: ResMut<PendingAssets>,
     mut images: ResMut<Assets<Image>>,
-    mut default_meshes: Res<DefaultMeshes>,
+    default_meshes: Res<DefaultMeshes>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for new in new.read() {
