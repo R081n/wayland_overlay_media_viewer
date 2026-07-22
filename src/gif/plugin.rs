@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 
 use crate::gif::{
-    GifAsset,
     components::GifLoader,
     messages::GifDespawnMessage,
     systems::{animate_gifs, despawn_gifs, initialize_gifs},
+    GifAsset,
 };
 
 pub struct GifPlugin;

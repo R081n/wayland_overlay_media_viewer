@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::gif::{Gif3d, GifAsset};
 use crate::{
     lifecycle,
     position::{PopupPosition, PIXELS_PER_METER},
@@ -14,7 +15,6 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
 };
-use bevy_easy_gif::{Gif3d, GifAsset};
 
 #[derive(Message, Clone)]
 pub struct ObjectMessage {

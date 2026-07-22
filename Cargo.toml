@@ -25,6 +25,8 @@ image = "0.25"
 ringbuf = "0.4"
 bevy_framepace = "0.22.0"
 image-webp = "0.2.4"
+gif = "0.13.3"
+thiserror = "2.0.17"
 
 [dependencies.bevy]
 version = "0.19"

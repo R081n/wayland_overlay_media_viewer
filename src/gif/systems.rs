@@ -1,12 +1,14 @@
+use std::time::Duration;
+
 use bevy::{
     asset::RenderAssetUsages,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 
-use crate::{
+use crate::gif::{
     Gif3d, GifNode,
-    gif::{Gif, GifAsset, GifDespawn, GifPlayer, messages::GifDespawnMessage},
+    {messages::GifDespawnMessage, Gif, GifAsset, GifDespawn, GifPlayer},
 };
 
 /// Initialize the [Gif]'s [Sprite] / [GifNode]'s [ImageNode] / [Gif3d]'s [MeshMaterial3d] with the first image of the sequence.
@@ -37,6 +39,7 @@ pub(crate) fn initialize_gifs(
                 frames,
                 handles,
                 times,
+                frame_end,
             } = asset.into_inner();
 
             // if let Some(asset) = gifs.get_mut(&handle) {
@@ -83,7 +86,10 @@ pub(crate) fn initialize_gifs(
 
             // initialize timer
             player.current = 0; // first frame
-            player.timer = Timer::new(frame.duration, TimerMode::Repeating);
+            player.timer = Timer::new(
+                Duration::from_secs_f64(frame_end.last().copied().unwrap_or(0.0)),
+                TimerMode::Repeating,
+            );
             player.remaining = *times;
         }
     }
@@ -117,11 +123,15 @@ pub(crate) fn animate_gifs(
 
         if let Some(gif_asset) = gifs.get(&handle) {
             player.timer.tick(time.delta());
-            if player.timer.is_finished() {
-                // Update timer
-                player.current = (player.current + 1) % gif_asset.frames.len();
-                let frame = &gif_asset.frames[player.current];
-                let new_duration = frame.duration;
+            let time_now = player.timer.elapsed_secs_f64();
+            let current = gif_asset
+                .frame_end
+                .iter()
+                .position(|t| *t > time_now)
+                .unwrap_or(0);
+
+            if player.current != current {
+                player.current = current;
 
                 if player.current == 0 {
                     // That means we just ended a loop !
@@ -135,8 +145,6 @@ pub(crate) fn animate_gifs(
                     }
                     // no else because it means it is an infinite-looping GIF.
                 }
-                player.timer.set_duration(new_duration);
-                player.timer.reset();
 
                 // Update sprite
                 let handle = gif_asset.handles[player.current].clone();

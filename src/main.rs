@@ -15,9 +15,9 @@ use bevy::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
     },
 };
-use bevy_easy_gif::GifPlugin;
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use wayland_overlay_media_viewer::{
+    gif::GifPlugin,
     lifecycle::LiveCyclePlugin,
     spawner::{ObjectMessage, PopupImage, PopupPlugin, PopupVideo},
     videos::plugin::{insert_video_component, VideoPlayer, VideoPlugin, VideoState, VideoTarget},
