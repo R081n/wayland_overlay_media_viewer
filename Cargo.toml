@@ -24,7 +24,8 @@ cpal = "0.15"
 image = "0.25"
 ringbuf = "0.4"
 bevy_framepace = "0.22.0"
+image-webp = "0.2.4"
 
 [dependencies.bevy]
 version = "0.19"
-features = ["http", "https", "jpeg", "png"]
+features = ["http", "https", "jpeg", "png", "webp", "gif"]

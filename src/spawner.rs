@@ -1,6 +1,6 @@
 use std::{
     f32::consts::PI,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -14,6 +14,7 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
 };
+use bevy_easy_gif::{Gif3d, GifAsset};
 
 #[derive(Message, Clone)]
 pub struct ObjectMessage {
@@ -21,7 +22,11 @@ pub struct ObjectMessage {
     pub position: PopupPosition,
     pub popup_animation: PopupAnimation,
     pub behaviour: PopupInteraction,
+    pub opacity: f32,
 }
+
+#[derive(Component)]
+pub struct TargetOpacity(pub f32);
 
 #[derive(Debug, Clone)]
 pub enum ObjectType {
@@ -48,6 +53,13 @@ pub struct PopupImage {
 }
 
 #[derive(Debug, Clone)]
+pub enum FileType {
+    StaticImage,
+    WebP,
+    Gif,
+}
+
+#[derive(Debug, Clone)]
 pub struct PopupVideo {
     pub uri: String,
 }
@@ -61,7 +73,7 @@ impl Plugin for PopupPlugin {
             .insert_resource(DefaultMeshes::default())
             .add_systems(Startup, init_rect_mesh)
             .add_systems(
-                Update,
+                PreUpdate,
                 (
                     preload_asset,
                     spawn_object,
@@ -95,7 +107,16 @@ fn preload_asset(
 ) {
     for new in new.read() {
         let handle = match &new.kind {
-            ObjectType::Image(popup_image) => assets.load::<Image>(&popup_image.uri).untyped(),
+            ObjectType::Image(popup_image) => {
+                match PathBuf::from(popup_image.uri.clone()).extension() {
+                    Some(ext) => match ext.to_str().unwrap_or_default() {
+                        "gif" => assets.load::<GifAsset>(&popup_image.uri).untyped(),
+                        "webp" => assets.load::<GifAsset>(&popup_image.uri).untyped(),
+                        _ => assets.load::<Image>(&popup_image.uri).untyped(),
+                    },
+                    None => assets.load::<Image>(&popup_image.uri).untyped(),
+                }
+            }
 
             // Handeled differently
             ObjectType::Video(popup_video) => continue,
@@ -123,6 +144,7 @@ fn spawn_object(
     server: ResMut<AssetServer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
+    mut gifs: ResMut<Assets<GifAsset>>,
     mut default_meshes: Res<DefaultMeshes>,
 ) {
     for (id, pending) in pending
@@ -131,26 +153,48 @@ fn spawn_object(
     {
         for msg in pending {
             let mut common = match &msg.kind {
-                ObjectType::Image(popup_image) => {
-                    let Ok(asset) = id.clone().try_typed::<Image>() else {
+                ObjectType::Image(_) => {
+                    if let Ok(asset) = id.clone().try_typed::<Image>() {
+                        let image = images.get(&asset).expect("asset to exist");
+
+                        CommonProps {
+                            commands: commands.spawn((
+                                Mesh3d(default_meshes.rect.clone()),
+                                MeshMaterial3d(materials.add(StandardMaterial {
+                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 0.1)),
+                                    unlit: true,
+                                    base_color_texture: Some(asset),
+                                    alpha_mode: AlphaMode::Blend,
+                                    ..default()
+                                })),
+                            )),
+                            scale: Vec3::new(image.width() as f32, image.height() as f32, 0.)
+                                / PIXELS_PER_METER,
+                        }
+                    } else if let Ok(asset) = id.clone().try_typed::<GifAsset>() {
+                        let image = gifs.get(&asset).expect("asset to exist");
+                        let scale = image
+                            .frames
+                            .get(0)
+                            .map(|i| Vec2::new(i.width as f32, i.height as f32))
+                            .unwrap_or(Vec2::splat(100.));
+                        CommonProps {
+                            commands: commands.spawn((
+                                Gif3d {
+                                    handle: asset.clone(),
+                                },
+                                Mesh3d(default_meshes.rect.clone()),
+                                MeshMaterial3d(materials.add(StandardMaterial {
+                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 1.)),
+                                    unlit: true,
+                                    alpha_mode: AlphaMode::Blend,
+                                    ..default()
+                                })),
+                            )),
+                            scale: scale.extend(0.) / PIXELS_PER_METER,
+                        }
+                    } else {
                         continue;
-                    };
-
-                    let image = images.get(&asset).expect("asset to exist");
-
-                    CommonProps {
-                        commands: commands.spawn((
-                            Mesh3d(default_meshes.rect.clone()),
-                            MeshMaterial3d(materials.add(StandardMaterial {
-                                base_color: Color::Srgba(Srgba::new(1., 1., 1., 0.1)),
-                                unlit: true,
-                                base_color_texture: Some(asset),
-                                alpha_mode: AlphaMode::Blend,
-                                ..default()
-                            })),
-                        )),
-                        scale: Vec3::new(image.width() as f32, image.height() as f32, 0.)
-                            / PIXELS_PER_METER,
                     }
                 }
                 // Not handled here
@@ -215,7 +259,7 @@ fn spawn_videos(
                     alpha_mode: AlphaMode::Blend,
                     ..default()
                 })),
-                Visibility::Visible,
+                Visibility::Hidden,
                 VideoDeferredObjectMessage(new.clone()),
             ))
             .insert(video_player);

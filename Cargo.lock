@@ -6420,6 +6420,7 @@ dependencies = [
  "cpal 0.15.3",
  "ffmpeg-next",
  "image",
+ "image-webp",
  "raw-window-handle",
  "ringbuf",
  "wayland-backend",

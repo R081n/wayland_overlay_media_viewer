@@ -7,6 +7,7 @@ use std::{
 };
 
 use bevy::{
+    app::TerminalCtrlCHandlerPlugin,
     asset::{io::web::WebAssetPlugin, RenderAssetUsages},
     prelude::*,
     render::{
@@ -14,8 +15,10 @@ use bevy::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
     },
 };
+use bevy_easy_gif::GifPlugin;
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use wayland_overlay_media_viewer::{
+    lifecycle::LiveCyclePlugin,
     spawner::{ObjectMessage, PopupImage, PopupPlugin, PopupVideo},
     videos::plugin::{insert_video_component, VideoPlayer, VideoPlugin, VideoState, VideoTarget},
     WallpaperTargetMonitor, WindowOverlayPlugin,
@@ -43,6 +46,7 @@ fn main() {
             })
             .set(window_plugin)
             .disable::<PipelinedRenderingPlugin>()
+            .disable::<TerminalCtrlCHandlerPlugin>()
             .set(AssetPlugin {
                 unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                 ..Default::default()
@@ -50,6 +54,8 @@ fn main() {
         PopupPlugin,
         VideoPlugin,
         FramepacePlugin,
+        LiveCyclePlugin,
+        GifPlugin,
     ));
 
     app.add_plugins(WindowOverlayPlugin {
@@ -156,25 +162,27 @@ fn setup(
 
     commands.write_message(ObjectMessage {
         kind: wayland_overlay_media_viewer::spawner::ObjectType::Image(PopupImage {
-            uri: "/home/robink/Pictures/Screenshot_20220203_103901.png".to_owned(),
+            uri: "".to_owned(),
         }),
         position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
-            45., 7., -20.,
+            45., 7., 0.0,
         )),
         popup_animation: wayland_overlay_media_viewer::spawner::PopupAnimation::None,
         behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
+        opacity: 1.0,
     });
 
-    commands.write_message(ObjectMessage {
-        kind: wayland_overlay_media_viewer::spawner::ObjectType::Video(PopupVideo {
-            uri: "/home/robink/Downloads/Big_Buck_Bunny_1080_10s_5MB.mp4".to_owned(),
-        }),
-        position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
-            37., 7., 0.0,
-        )),
-        popup_animation: wayland_overlay_media_viewer::spawner::PopupAnimation::SlideFadeIn,
-        behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
-    });
+    // commands.delayed().secs(3.0).write_message(ObjectMessage {
+    //     kind: wayland_overlay_media_viewer::spawner::ObjectType::Video(PopupVideo {
+    //         uri: "".to_owned(),
+    //     }),
+    //     position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
+    //         37., 7., 0.0,
+    //     )),
+    //     popup_animation: wayland_overlay_media_viewer::spawner::PopupAnimation::SlideFadeIn,
+    //     behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
+    //     opacity: 0.9,
+    // });
 
     commands.spawn((
         PointLight {

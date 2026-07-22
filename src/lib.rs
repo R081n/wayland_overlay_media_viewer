@@ -1,5 +1,6 @@
 mod backend;
 pub mod cleanup;
+pub mod gif;
 pub mod images;
 pub mod lifecycle;
 pub mod position;
