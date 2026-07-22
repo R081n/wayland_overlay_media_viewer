@@ -15,8 +15,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::gif::{
-        {components::GifLoader, messages::GifDespawnMessage, systems::*},
-        *,
+        components::AnimationImageLoader, messages::GifDespawnMessage, systems::*, *,
     };
     use bevy::prelude::*;
 
@@ -31,7 +30,7 @@ mod tests {
         app.init_asset::<Image>();
         app.init_asset::<StandardMaterial>();
         app.init_asset::<GifAsset>();
-        app.init_asset_loader::<GifLoader>();
+        app.init_asset_loader::<AnimationImageLoader>();
         app
     }
 

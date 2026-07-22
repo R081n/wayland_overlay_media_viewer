@@ -161,7 +161,7 @@ fn spawn_object(
                             commands: commands.spawn((
                                 Mesh3d(default_meshes.rect.clone()),
                                 MeshMaterial3d(materials.add(StandardMaterial {
-                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 0.1)),
+                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 0.)),
                                     unlit: true,
                                     base_color_texture: Some(asset),
                                     alpha_mode: AlphaMode::Blend,
@@ -185,7 +185,7 @@ fn spawn_object(
                                 },
                                 Mesh3d(default_meshes.rect.clone()),
                                 MeshMaterial3d(materials.add(StandardMaterial {
-                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 1.)),
+                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 0.)),
                                     unlit: true,
                                     alpha_mode: AlphaMode::Blend,
                                     ..default()

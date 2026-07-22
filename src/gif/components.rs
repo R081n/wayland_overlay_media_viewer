@@ -4,7 +4,11 @@ use bevy::{
     asset::{io::Reader, AssetLoader, LoadContext},
     prelude::*,
 };
-use gif::{ColorOutput, DecodeOptions, Repeat};
+use image::{
+    codecs::{gif::GifDecoder, webp::WebPDecoder},
+    metadata::LoopCount,
+    AnimationDecoder as _, ImageError,
+};
 use thiserror::Error;
 
 /// Entity used to spawn a [Sprite] with an animated texture.
@@ -33,7 +37,7 @@ pub struct Gif {
 pub struct GifPlayer {
     pub current: usize,
     pub timer: Timer,
-    pub remaining: Option<u16>,
+    pub remaining: Option<u32>,
 }
 
 impl Default for GifPlayer {
@@ -50,7 +54,7 @@ impl Default for GifPlayer {
 ///
 /// What really distinguish this from using a [TextureAtlas] is the unique [Duration] of each frame,
 /// stored within the asset.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Reflect)]
 pub struct GifFrame {
     pub width: u32,
     pub height: u32,
@@ -63,35 +67,36 @@ pub struct GifFrame {
 /// Careful: `times` represents the raw value of the GIF repeat metadata, which can
 /// be interpreted as "how many times will I _repeat_", with an emphasis on _repeat_.
 /// For a GIF that plays a total of 5 loops, this value is going to be 4.
-#[derive(Asset, TypePath, Debug, Clone)]
+#[derive(Asset, Debug, Clone, Reflect)]
 pub struct GifAsset {
     pub frames: Vec<GifFrame>,
     pub handles: Vec<Handle<Image>>,
-    pub times: Option<u16>,
+    pub times: Option<u32>,
     pub frame_end: Vec<f64>,
 }
 
 #[derive(Error, Debug)]
-pub(crate) enum GifLoaderError {
+pub(crate) enum AnimationDecodeError {
     /// An [IO](std::io) Error
     #[error("Could not load asset: {0}")]
     Io(#[from] std::io::Error),
-    /// A [gif](gif) DecodingError
-    #[error("Could not decode asset: {0}")]
-    Decode(#[from] gif::DecodingError),
+
     /// A data error
-    #[error("Decoded gif frame size mismatch: {0} != {1}")]
-    SizeMismatch(usize, usize),
+    #[error("Image rerror: {0}")]
+    ImageError(#[from] ImageError),
+
+    #[error("Format not supported")]
+    UnsupportedFormat,
 }
 
 /// Allow to load GIF files properly with the AssetServer
 #[derive(Default, TypePath)]
-pub(crate) struct GifLoader;
+pub(crate) struct AnimationImageLoader;
 
-impl AssetLoader for GifLoader {
+impl AssetLoader for AnimationImageLoader {
     type Asset = GifAsset;
     type Settings = bool;
-    type Error = GifLoaderError;
+    type Error = AnimationDecodeError;
 
     async fn load(
         &self,
@@ -100,137 +105,71 @@ impl AssetLoader for GifLoader {
         _load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
 
-        let mut decoder = DecodeOptions::new();
-        decoder.set_color_output(ColorOutput::RGBA);
-        let mut decoder = decoder.read_info(std::io::Cursor::new(bytes))?;
-
-        let canvas_width = decoder.width() as u32;
-        let canvas_height = decoder.height() as u32;
-
-        // The active canvas used for rendering the current frame
-        let mut canvas_rgba = vec![0u8; (canvas_width as usize) * (canvas_height as usize) * 4];
-
-        // A backup canvas to support DisposalMethod::Previous
-        let mut previous_canvas = canvas_rgba.clone();
         let mut frame_end = Vec::new();
         let mut current_time = 0.0;
 
+        // 1. Read raw file bytes into the buffer
+        reader.read_to_end(&mut bytes).await?;
+
+        // 2. Automatically deduce the format (GIF or WebP) from the header magic numbers
+        let format = image::guess_format(&bytes)?;
+        let cursor = std::io::Cursor::new(bytes);
+
+        // 3. Dynamically allocate the correct trait object to decode frames automatically
+        let (loop_count, frames_iterator) = match format {
+            image::ImageFormat::Gif => {
+                let decoder = GifDecoder::new(cursor)?;
+                (decoder.loop_count(), decoder.into_frames())
+            }
+            image::ImageFormat::WebP => {
+                let decoder = WebPDecoder::new(cursor)?;
+                (decoder.loop_count(), decoder.into_frames())
+            }
+            _ => return Err(AnimationDecodeError::UnsupportedFormat),
+        };
+
         let mut frames = Vec::new();
-        while let Some(frame) = decoder.read_next_frame()? {
-            let f_width = frame.width as u32;
-            let f_height = frame.height as u32;
-            let f_left = frame.left as u32;
-            let f_top = frame.top as u32;
-            let f_rgba = frame.buffer.to_vec();
 
-            if f_rgba.len() != (f_width as usize) * (f_height as usize) * 4 {
-                return Err(Self::Error::SizeMismatch(
-                    f_rgba.len(),
-                    (f_width as usize) * (f_height as usize) * 4,
-                ));
-            }
+        // 4. Iterate over the frames. Under the hood, `image` has already performed
+        // all frame differencing, blending, and background/previous disposal methods.
+        for frame_result in frames_iterator {
+            let frame = frame_result?;
 
-            // BACKUP STEP: If the NEXT frame needs to restore to the current state,
-            // we save the canvas state *before* we apply the new frame modifications.
-            // (Only needed if the current disposal method is NOT 'Previous')
-            if frame.dispose != gif::DisposalMethod::Previous {
-                previous_canvas = canvas_rgba.clone();
-            }
+            let duration = Duration::from(frame.delay());
 
-            // Draw the current frame onto the active canvas
-            for y in 0..f_height {
-                let canvas_y = f_top + y;
-                if canvas_y >= canvas_height {
-                    continue;
-                }
-
-                for x in 0..f_width {
-                    let canvas_x = f_left + x;
-                    if canvas_x >= canvas_width {
-                        continue;
-                    }
-
-                    let f_idx = ((y * f_width) + x) as usize * 4;
-                    let canvas_idx = ((canvas_y * canvas_width) + canvas_x) as usize * 4;
-
-                    let alpha = f_rgba[f_idx + 3];
-
-                    // Only overwrite if the incoming pixel is not transparent
-                    if alpha > 0 {
-                        canvas_rgba[canvas_idx] = f_rgba[f_idx];
-                        canvas_rgba[canvas_idx + 1] = f_rgba[f_idx + 1];
-                        canvas_rgba[canvas_idx + 2] = f_rgba[f_idx + 2];
-                        canvas_rgba[canvas_idx + 3] = f_rgba[f_idx + 3];
-                    }
-                }
-            }
-
-            let ms = (frame.delay as u64).saturating_mul(10);
-            current_time += ms as f64 / 1000.;
+            current_time += duration.as_secs_f64();
             frame_end.push(current_time);
-            let duration = Duration::from_millis(ms.max(1));
 
-            // Save the fully compiled frame
+            // Convert the automatically composited underlying frame directly to an RGBA8 buffer
+            let image_buffer = frame.into_buffer();
+            let width = image_buffer.width();
+            let height = image_buffer.height();
+            let rgba = image_buffer.into_raw();
+
             frames.push(GifFrame {
-                width: canvas_width,
-                height: canvas_height,
-                rgba: canvas_rgba.clone(),
+                width,
+                height,
+                rgba,
                 duration,
             });
-
-            // DISPOSAL STEP: Handle the canvas after saving the frame
-            match frame.dispose {
-                gif::DisposalMethod::Background => {
-                    // Clear only the area occupied by the current frame
-                    for y in 0..f_height {
-                        let canvas_y = f_top + y;
-                        if canvas_y >= canvas_height {
-                            continue;
-                        }
-
-                        for x in 0..f_width {
-                            let canvas_x = f_left + x;
-                            if canvas_x >= canvas_width {
-                                continue;
-                            }
-
-                            let canvas_idx = ((canvas_y * canvas_width) + canvas_x) as usize * 4;
-                            canvas_rgba[canvas_idx] = 0;
-                            canvas_rgba[canvas_idx + 1] = 0;
-                            canvas_rgba[canvas_idx + 2] = 0;
-                            canvas_rgba[canvas_idx + 3] = 0;
-                        }
-                    }
-                }
-                gif::DisposalMethod::Previous => {
-                    // Roll back the entire canvas to the state before this frame was drawn
-                    canvas_rgba = previous_canvas.clone();
-                }
-                _ => {
-                    // Keep / Any: Do nothing, let the next frame build directly on top
-                }
-            }
         }
-
-        let times = match decoder.repeat() {
-            Repeat::Infinite => None,
-            Repeat::Finite(n) => Some(n),
-        };
 
         // Create the GifAsset and set it as the default loaded asset
         let asset = GifAsset {
             frames,
             handles: vec![], // will be loaded in `initialize_gifs`
-            times,
+            times: match loop_count {
+                LoopCount::Infinite => None,
+                LoopCount::Finite(count) => Some(count.get()),
+            },
             frame_end,
         };
         Ok(asset)
     }
 
     fn extensions(&self) -> &[&str] {
-        &["gif"]
+        &["gif", "webp"]
     }
 }
 

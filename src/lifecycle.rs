@@ -47,7 +47,7 @@ struct SlideFadeInAnimation {
 impl SlideFadeInAnimation {
     fn new() -> Self {
         Self {
-            duration_secs: 0.5,
+            duration_secs: 2.5,
             ..Default::default()
         }
     }
