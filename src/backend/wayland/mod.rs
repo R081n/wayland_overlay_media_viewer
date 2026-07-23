@@ -1,4 +1,5 @@
 pub mod backend;
+pub mod input_region_sync;
 pub mod render;
 pub mod surface;
 

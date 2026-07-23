@@ -49,6 +49,7 @@ pub enum ObjectType {
 #[derive(Debug, Clone)]
 pub enum PopupInteraction {
     ClickThough,
+    Clickable,
 }
 
 #[derive(Debug, Clone)]

@@ -19,4 +19,5 @@ pub struct ScreenPosition {
     /// Rectangle in world space coordinates
     pub pixel_min: I64Vec2,
     pub pixel_size: U64Vec2,
+    pub output: u32,
 }

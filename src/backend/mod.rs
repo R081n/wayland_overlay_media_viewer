@@ -11,6 +11,8 @@ pub mod target_monitor;
 
 mod wayland;
 
+pub use wayland::{input_region_sync::Clickable, input_region_sync::RequestInputRecalc};
+
 pub use plugin::WindowOverlayPlugin;
 
 pub use input::{PointerButton, PointerSample, WallpaperPointerState};

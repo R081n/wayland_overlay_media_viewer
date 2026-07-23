@@ -15,6 +15,8 @@ use bevy::{
 use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
+use crate::RequestInputRecalc;
+use crate::backend::wayland::input_region_sync::LayerShellInputPlugin;
 use crate::position::{PIXELS_PER_METER, ScreenPosition};
 use crate::{
     PointerSample, WallpaperPointerState, WallpaperSurfaceInfo, WallpaperTargetMonitor,
@@ -77,14 +79,15 @@ impl Plugin for WaylandBackendPlugin {
             ))
             .add_systems(PostUpdate, wayland_event_system)
             .insert_non_send(WaylandEventQueue(event_queue))
-            .insert_non_send(app_state);
+            .insert_non_send(app_state)
+            .add_plugins(LayerShellInputPlugin);
     }
 }
 
 #[derive(Resource, Deref, DerefMut)]
-struct WaylandEventQueue(EventQueue<WaylandAppState>);
+pub(crate) struct WaylandEventQueue(EventQueue<WaylandAppState>);
 
-fn wayland_event_system(
+pub fn wayland_event_system(
     mut commands: Commands,
     mut event_queue: NonSendMut<WaylandEventQueue>,
     mut app_state: NonSendMut<WaylandAppState>,
@@ -167,22 +170,14 @@ fn wayland_event_system(
 }
 
 fn create_transform(entry: &SurfaceDescriptorEntry) -> (Transform, ScreenPosition) {
-    let fov_v = FRAC_PI_4;
-    let half_fov_v_tan = (fov_v / 2.0).tan();
-
-    // Target dimensions (w and h)
     let w_target = entry.width as f32 / PIXELS_PER_METER;
     let h_target = entry.height as f32 / PIXELS_PER_METER;
 
-    // 3. Compute distance required for vertical fit (y-axis)
-    let z = h_target / (2.0 * half_fov_v_tan);
-
-    // 4. Translate Bottom-Left corner into World Space Center Coordinates
     let center_x = entry.offset_x as f32 / PIXELS_PER_METER + (w_target / 2.0);
     let center_y = entry.offset_y as f32 / PIXELS_PER_METER + (h_target / 2.0);
 
     (
-        Transform::from_translation(Vec3::new(center_x, center_y, z))
+        Transform::from_translation(Vec3::new(center_x, center_y, 10.0))
             .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y),
         ScreenPosition {
             rect: Rect::from_center_size(
@@ -191,6 +186,7 @@ fn create_transform(entry: &SurfaceDescriptorEntry) -> (Transform, ScreenPositio
             ),
             pixel_min: I64Vec2::new(entry.offset_x as i64, entry.offset_y as i64),
             pixel_size: U64Vec2::new(entry.width as u64, entry.height as u64),
+            output: entry.output,
         },
     )
 }
@@ -202,11 +198,9 @@ fn spawn_camera(
 ) -> Entity {
     let image = create_wayland_image(images, config.width, config.height);
 
-    // Target dimensions (w and h)
     let w_target = config.width as f32 / PIXELS_PER_METER;
     let h_target = config.height as f32 / PIXELS_PER_METER;
 
-    // 4. Translate Bottom-Left corner into World Space Center Coordinates
     let center_x = config.offset_x as f32 / PIXELS_PER_METER + (w_target / 2.0);
     let center_y = config.offset_y as f32 / PIXELS_PER_METER + (h_target / 2.0);
 
@@ -229,11 +223,13 @@ fn spawn_camera(
                 ),
                 pixel_min: I64Vec2::new(config.offset_x as i64, config.offset_y as i64),
                 pixel_size: U64Vec2::new(config.width as u64, config.height as u64),
+                output: config.output,
             },
             RenderTarget::Image(ImageRenderTarget {
                 handle: image,
                 scale_factor: 1.0,
             }),
+            RequestInputRecalc::default(),
             ClusterConfig::Single,
             NoIndirectDrawing,
         ))

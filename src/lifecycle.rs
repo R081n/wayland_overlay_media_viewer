@@ -10,8 +10,9 @@ use rand::RngExt;
 
 use crate::{
     draw_order::DrawOrder,
-    position::{PIXELS_PER_METER, PopupPosition, ScreenPosition},
+    position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
     spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
+    Clickable,
 };
 
 pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) {
@@ -42,6 +43,13 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
             duration,
             kind: msg.close_animation,
         });
+    }
+
+    match msg.behaviour {
+        crate::spawner::PopupInteraction::ClickThough => {
+            commands.insert(Clickable);
+        }
+        crate::spawner::PopupInteraction::Clickable => {}
     }
 
     static NEXT_ID: AtomicI64 = AtomicI64::new(0);
