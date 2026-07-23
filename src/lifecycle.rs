@@ -1,20 +1,16 @@
 use std::{
     ops::{Add, Div},
-    sync::atomic::{AtomicI64, AtomicU64},
+    sync::atomic::AtomicI64,
     time::Duration,
 };
 
-use bevy::{
-    ecs::{self},
-    math::I64Vec2,
-    prelude::*,
-};
+use bevy::{math::I64Vec2, prelude::*};
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
     draw_order::DrawOrder,
-    position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
+    position::{PIXELS_PER_METER, PopupPosition, ScreenPosition},
     spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
 };
 
@@ -236,7 +232,7 @@ fn handle_closing(
                         commands.entity(id).despawn();
                     }
 
-                    (&mut alpha).smooth_nudge(&0.0, 1., delta);
+                    alpha.smooth_nudge(&0.0, 1., delta);
                     mat.base_color.set_alpha(alpha);
                 }
             }

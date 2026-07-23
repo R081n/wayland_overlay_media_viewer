@@ -213,7 +213,6 @@ fn spawn_camera(
     let transform = Transform::from_translation(Vec3::new(center_x, center_y, 10.0))
         .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y);
 
-
     commands
         .spawn((
             WaylandRenderTarget::new(image.clone()),

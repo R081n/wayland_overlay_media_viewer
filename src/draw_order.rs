@@ -3,10 +3,10 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
     render::{
+        Render, RenderApp,
         extract_component::{ExtractComponent, ExtractComponentPlugin},
         render_phase::ViewSortedRenderPhases,
         sync_world::MainEntity,
-        Render, RenderApp,
     },
 };
 
