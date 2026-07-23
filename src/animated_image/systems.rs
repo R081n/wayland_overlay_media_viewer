@@ -38,15 +38,17 @@ pub(crate) fn initialize_gifs(
 
         if let Some(asset) = gifs.get_mut(&handle) {
             let GifAsset {
-                frames,
+                frames: _,
                 handles,
                 times,
                 frame_end,
             } = asset.into_inner();
 
-            // Get first frame and load it to the sprite
-            let _frame = frames.first().unwrap();
+            if handles.is_empty() {
+                continue;
+            }
             let handle = handles.first().unwrap();
+
             // unwrap()-ing is fine here, because this is called after `asset_server.load()`,
             // which would panic if there is an issue with the GIF file.
             if let Some((_, mut sprite)) = gif_option {
@@ -74,6 +76,9 @@ pub(crate) fn initialize_gifs(
             player.remaining = *times;
 
             commands.entity(id).insert(GifInitialized);
+            if handles.len() == 1 {
+                commands.entity(id).remove::<GifPlayer>();
+            }
         }
     }
 }

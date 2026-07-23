@@ -5,7 +5,7 @@ use bevy::{
     prelude::*,
 };
 use image::{
-    AnimationDecoder as _, ImageError,
+    AnimationDecoder as _, ImageError, ImageReader,
     codecs::{gif::GifDecoder, webp::WebPDecoder},
     imageops::resize,
     metadata::LoopCount,
@@ -116,7 +116,7 @@ impl AssetLoader for AnimationImageLoader {
 
         // 2. Automatically deduce the format (GIF or WebP) from the header magic numbers
         let format = image::guess_format(&bytes)?;
-        let cursor = std::io::Cursor::new(bytes);
+        let cursor = std::io::Cursor::new(&mut bytes);
 
         // 3. Dynamically allocate the correct trait object to decode frames automatically
         let (loop_count, frames_iterator) = match format {
@@ -168,6 +168,17 @@ impl AssetLoader for AnimationImageLoader {
                 height,
                 rgba,
                 duration,
+            });
+        }
+
+        if frames.is_empty() {
+            let cursor = std::io::Cursor::new(&mut bytes);
+            let image = ImageReader::new(cursor).with_guessed_format()?.decode()?;
+            frames.push(GifFrame {
+                width: image.width(),
+                height: image.height(),
+                rgba: image.into_rgba8().into_vec(),
+                duration: Duration::from_secs(1),
             });
         }
 

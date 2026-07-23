@@ -12,10 +12,17 @@ use crate::{
     spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
 };
 
+#[derive(Component)]
+pub struct PopupMarker;
+
 pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) {
+    commands.insert(PopupMarker);
     match msg.position {
         PopupPosition::Global(vec3) => {
-            commands.insert(Transform::from_translation(vec3));
+            commands
+                .entry::<Transform>()
+                .or_default()
+                .and_modify(move |mut t| *t = t.with_translation(vec3));
         }
         PopupPosition::SceenSpace(_, _vec2) => todo!(),
         PopupPosition::Random => {
@@ -48,7 +55,8 @@ impl Plugin for LiveCyclePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (handle_slide_fade_in, handle_closing))
             .add_observer(handle_random_position)
-            .add_observer(on_close_in);
+            .add_observer(on_close_in)
+            .add_observer(move_all_back_on_insert);
     }
 }
 
@@ -56,7 +64,6 @@ impl Plugin for LiveCyclePlugin {
 struct SlideFadeInAnimation {
     progress: f32,
     started: bool,
-    start_depth: f32,
     duration_secs: f32,
 }
 
@@ -85,7 +92,6 @@ fn handle_slide_fade_in(
     for (id, mut transform, mesh_material3d, mut animation, target_opacity) in objects.iter_mut() {
         if !animation.started {
             transform.scale -= DISTANCE;
-            animation.start_depth = transform.translation.z;
             animation.started = true;
 
             if let Some(mut mat) = materials.get_mut(mesh_material3d.id()) {
@@ -145,7 +151,6 @@ fn handle_random_position(
         .sum::<u64>();
 
     let mut rand = rng.random_range(..total);
-    let z = rng.random_range(..(1e10 as u64)) as f32 / 1e12;
 
     for screen in screens.iter() {
         let rect = screen.pixel_size;
@@ -180,9 +185,7 @@ fn handle_random_position(
             .add(image_size.div(2).as_dvec2())
             / pixels_per_meter)
             .as_vec2();
-        obj.translation.x = pos.x;
-        obj.translation.y = pos.y;
-        obj.translation.z = z;
+        obj.translation = pos.extend(0.0);
 
         break;
     }
@@ -223,7 +226,7 @@ fn handle_closing(
                 let delta = time.delta_secs();
                 if let Some(mut mat) = materials.get_mut(handle.id()) {
                     let mut alpha = mat.base_color.alpha();
-                    if alpha < 0.001 {
+                    if alpha < 0.000001 {
                         commands.entity(id).despawn();
                     }
 
@@ -232,5 +235,20 @@ fn handle_closing(
                 }
             }
         }
+    }
+}
+
+fn move_all_back_on_insert(
+    _trigger: On<Insert, PopupMarker>,
+    query: Query<&mut Transform, With<PopupMarker>>,
+) {
+    for mut transform in query {
+        transform.translation.z = transform
+            .translation
+            .z
+            .next_down()
+            .next_down()
+            .next_down()
+            .next_down();
     }
 }
