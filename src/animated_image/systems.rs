@@ -1,10 +1,6 @@
 use std::time::Duration;
 
-use bevy::{
-    asset::RenderAssetUsages,
-    prelude::*,
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
-};
+use bevy::prelude::*;
 
 use crate::animated_image::{
     Gif3d, GifNode,

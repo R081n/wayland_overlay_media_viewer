@@ -1,4 +1,3 @@
-use bevy::prelude::*;
 use wayland_overlay_media_viewer::spawner::{ObjectMessage, PopupImage};
 
 fn main() {

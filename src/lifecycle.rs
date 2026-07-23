@@ -1,7 +1,7 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div};
 
 use bevy::{
-    math::{DVec2, I64Vec2, U64Vec2, VectorSpace},
+    math::I64Vec2,
     prelude::*,
 };
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
@@ -133,7 +133,7 @@ fn handle_random_position(
     let mut image_size = (obj.scale.xy() * PIXELS_PER_METER).as_u64vec2();
 
     // The total amount of possible pixel positions for this image
-    let total = (&screens)
+    let total = screens
         .iter()
         .map(|s| s.pixel_size.element_product())
         .sum::<u64>();

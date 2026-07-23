@@ -1,3 +1,6 @@
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+
 pub mod animated_image;
 mod backend;
 pub mod cleanup;
@@ -11,23 +14,18 @@ use std::time::Duration;
 
 pub use backend::*;
 use bevy::{
-    DefaultPlugins,
     app::{App, PluginGroup as _, PreUpdate, Startup, TerminalCtrlCHandlerPlugin, Update},
-    asset::{AssetPlugin, io::web::WebAssetPlugin},
+    asset::{io::web::WebAssetPlugin, AssetPlugin},
     camera::ClearColor,
     color::Color,
     ecs::{
-        message::MessageWriter,
-        resource::Resource,
-        schedule::IntoScheduleConfigs,
-        system::{Commands, ResMut},
+        message::MessageWriter, resource::Resource, schedule::IntoScheduleConfigs, system::ResMut,
     },
     image::ImagePlugin,
-    math::Vec3,
     render::pipelined_rendering::PipelinedRenderingPlugin,
-    time::DelayedCommandsExt as _,
     window::WindowPlugin,
     winit::WinitPlugin,
+    DefaultPlugins,
 };
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
@@ -36,7 +34,7 @@ use crossbeam_channel::{Receiver, Sender};
 use crate::{
     animated_image::AnimatedImagePlugin,
     lifecycle::LiveCyclePlugin,
-    spawner::{ObjectMessage, PopupImage, PopupPlugin, preload_asset},
+    spawner::{preload_asset, ObjectMessage, PopupPlugin},
     videos::plugin::VideoPlugin,
 };
 
