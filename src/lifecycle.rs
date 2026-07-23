@@ -12,11 +12,7 @@ use crate::{
     spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
 };
 
-#[derive(Component)]
-pub struct PopupMarker;
-
 pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) {
-    commands.insert(PopupMarker);
     match msg.position {
         PopupPosition::Global(vec3) => {
             commands
@@ -47,21 +43,28 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
     }
 
     commands.insert(TargetOpacity(msg.opacity));
+
+    let id = commands.id().index_u32() as f32;
+    dbg!(id);
+
+    commands
+        .entry::<Transform>()
+        .or_default()
+        .and_modify(move |mut t| t.translation.z = (id / 100.) - 10.0);
 }
 
 pub struct LiveCyclePlugin;
 
 impl Plugin for LiveCyclePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (handle_slide_fade_in, handle_closing))
+        app.add_systems(Update, (handle_slide_fade_in, handle_closing).chain())
             .add_observer(handle_random_position)
-            .add_observer(on_close_in)
-            .add_observer(move_all_back_on_insert);
+            .add_observer(on_close_in);
     }
 }
 
 #[derive(Component, Default)]
-struct SlideFadeInAnimation {
+pub(crate) struct SlideFadeInAnimation {
     progress: f32,
     started: bool,
     duration_secs: f32,
@@ -76,7 +79,7 @@ impl SlideFadeInAnimation {
     }
 }
 
-fn handle_slide_fade_in(
+pub(crate) fn handle_slide_fade_in(
     mut commands: Commands,
     time: Res<Time>,
     mut objects: Query<(
@@ -230,25 +233,10 @@ fn handle_closing(
                         commands.entity(id).despawn();
                     }
 
-                    (&mut alpha).smooth_nudge(&0.0, 10., delta);
+                    (&mut alpha).smooth_nudge(&0.0, 1., delta);
                     mat.base_color.set_alpha(alpha);
                 }
             }
         }
-    }
-}
-
-fn move_all_back_on_insert(
-    _trigger: On<Insert, PopupMarker>,
-    query: Query<&mut Transform, With<PopupMarker>>,
-) {
-    for mut transform in query {
-        transform.translation.z = transform
-            .translation
-            .z
-            .next_down()
-            .next_down()
-            .next_down()
-            .next_down();
     }
 }

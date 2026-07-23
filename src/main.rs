@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use bevy::math::Vec3;
+use rand::seq::SliceRandom;
 use wayland_overlay_media_viewer::{
     position::PopupPosition,
     spawner::{
         ObjectCloseCondition, ObjectMessage, ObjectType, PopupImage, PopupInAnimation,
-        PopupInteraction, PopupOutAnimation,
+        PopupInteraction, PopupOutAnimation, PopupVideo,
     },
 };
 
@@ -18,22 +18,22 @@ fn main() {
         if let Ok(dir) = std::fs::read_dir(&line) {
             let sender = sender.clone();
             std::thread::spawn(move || {
-                let mut z: f32 = 0.0;
+                let mut list: Vec<_> = dir.flatten().collect();
+                list.shuffle(&mut rand::rng());
 
-                for entry in dir.flatten() {
-                    z = z.next_down().next_down();
+                for entry in list {
                     sender.send(ObjectMessage {
                         kind: ObjectType::Image(PopupImage {
                             uri: entry.path().to_string_lossy().into_owned(),
                         }),
 
-                        position: PopupPosition::Global(Vec3::new(3., 3., z)),
+                        position: PopupPosition::Random,
                         popup_animation: PopupInAnimation::SlideFadeIn,
                         behaviour: PopupInteraction::ClickThough,
-                        opacity: 0.4,
+                        opacity: 0.9,
                         close_animation: PopupOutAnimation::FadeOut,
                         close_condition: ObjectCloseCondition {
-                            duration: Some(Duration::from_secs_f64(5.0)),
+                            duration: Some(Duration::from_secs_f64(20.0)),
                             click: None,
                         },
                     });
@@ -43,16 +43,24 @@ fn main() {
         }
 
         sender.send(ObjectMessage {
-            kind: ObjectType::Image(PopupImage { uri: line }),
+            kind: to_type(line),
             position: PopupPosition::Random,
             popup_animation: PopupInAnimation::SlideFadeIn,
             behaviour: PopupInteraction::ClickThough,
-            opacity: 0.4,
+            opacity: 0.9,
             close_animation: PopupOutAnimation::FadeOut,
             close_condition: ObjectCloseCondition {
-                duration: Some(Duration::from_secs(1)),
+                duration: Some(Duration::from_secs(1000)),
                 click: None,
             },
         });
+    }
+}
+
+fn to_type(string: String) -> ObjectType {
+    if string.ends_with("mp4") || string.ends_with("webm") {
+        ObjectType::Video(PopupVideo { uri: string })
+    } else {
+        ObjectType::Image(PopupImage { uri: string })
     }
 }

@@ -14,18 +14,19 @@ use std::time::Duration;
 
 pub use backend::*;
 use bevy::{
-    DefaultPlugins,
     app::{App, PluginGroup as _, PreUpdate, Startup, TerminalCtrlCHandlerPlugin, Update},
-    asset::{AssetPlugin, io::web::WebAssetPlugin},
+    asset::{io::web::WebAssetPlugin, AssetPlugin},
     camera::ClearColor,
     color::Color,
     ecs::{
         message::MessageWriter, resource::Resource, schedule::IntoScheduleConfigs, system::ResMut,
     },
     image::ImagePlugin,
+    pbr::PbrPlugin,
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::WindowPlugin,
     winit::WinitPlugin,
+    DefaultPlugins,
 };
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
@@ -34,7 +35,7 @@ use crossbeam_channel::{Receiver, Sender};
 use crate::{
     animated_image::AnimatedImagePlugin,
     lifecycle::LiveCyclePlugin,
-    spawner::{ObjectMessage, PopupPlugin, preload_asset},
+    spawner::{preload_asset, ObjectMessage, PopupPlugin},
     videos::plugin::VideoPlugin,
 };
 
@@ -89,6 +90,12 @@ fn startup_inner(rx: DataReceiver) {
             })
             .set(AssetPlugin {
                 unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
+                ..Default::default()
+            })
+            .set(PbrPlugin {
+                add_default_deferred_lighting_plugin: false,
+                prepass_enabled: false,
+                use_gpu_instance_buffer_builder: true,
                 ..Default::default()
             }),
         PopupPlugin,

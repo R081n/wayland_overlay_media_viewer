@@ -1,7 +1,9 @@
 use std::io::ErrorKind;
 use std::{collections::HashSet, f32::consts::FRAC_PI_4};
 
+use bevy::light::cluster::ClusterConfig;
 use bevy::math::{I64Vec2, U64Vec2};
+use bevy::render::view::NoIndirectDrawing;
 use bevy::{
     camera::{ImageRenderTarget, RenderTarget},
     prelude::*,
@@ -200,31 +202,26 @@ fn spawn_camera(
 ) -> Entity {
     let image = create_wayland_image(images, config.width, config.height);
 
-    let fov_v = FRAC_PI_4; // Already in radians
-    let half_fov_v_tan = (fov_v / 2.0).tan();
-
     // Target dimensions (w and h)
     let w_target = config.width as f32 / PIXELS_PER_METER;
     let h_target = config.height as f32 / PIXELS_PER_METER;
-
-    // 3. Compute distance required for vertical fit (y-axis)
-    let z = h_target / (2.0 * half_fov_v_tan);
 
     // 4. Translate Bottom-Left corner into World Space Center Coordinates
     let center_x = config.offset_x as f32 / PIXELS_PER_METER + (w_target / 2.0);
     let center_y = config.offset_y as f32 / PIXELS_PER_METER + (h_target / 2.0);
 
-    let transform = Transform::from_translation(Vec3::new(center_x, center_y, z))
+    let transform = Transform::from_translation(Vec3::new(center_x, center_y, 10.0))
         .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y);
+
 
     commands
         .spawn((
             WaylandRenderTarget::new(image.clone()),
             Camera3d::default(),
             transform,
-            Projection::Perspective(PerspectiveProjection {
-                fov: fov_v,
-                ..PerspectiveProjection::default()
+            Projection::Orthographic(OrthographicProjection {
+                scale: 1.0 / PIXELS_PER_METER,
+                ..OrthographicProjection::default_3d()
             }),
             ScreenPosition {
                 rect: Rect::from_center_size(
@@ -238,6 +235,8 @@ fn spawn_camera(
                 handle: image,
                 scale_factor: 1.0,
             }),
+            ClusterConfig::Single,
+            NoIndirectDrawing,
         ))
         .id()
 }

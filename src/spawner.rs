@@ -4,11 +4,14 @@ use std::{
     time::Duration,
 };
 
-use crate::animated_image::{Gif3d, GifAsset};
+use crate::{
+    animated_image::{Gif3d, GifAsset},
+    lifecycle::handle_slide_fade_in,
+};
 use crate::{
     lifecycle,
-    position::{PIXELS_PER_METER, PopupPosition},
-    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
+    position::{PopupPosition, PIXELS_PER_METER},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 
@@ -94,7 +97,8 @@ impl Plugin for PopupPlugin {
                     spawn_videos,
                     wait_for_video_to_load,
                 )
-                    .chain(),
+                    .chain()
+                    .before(handle_slide_fade_in),
             );
     }
 }
@@ -171,7 +175,7 @@ fn spawn_object(
                             commands: commands.spawn((
                                 Mesh3d(default_meshes.rect.clone()),
                                 MeshMaterial3d(materials.add(StandardMaterial {
-                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 1.)),
+                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., msg.opacity)),
                                     unlit: true,
                                     base_color_texture: Some(asset),
                                     alpha_mode: AlphaMode::Blend,
@@ -196,7 +200,7 @@ fn spawn_object(
                                 },
                                 Mesh3d(default_meshes.rect.clone()),
                                 MeshMaterial3d(materials.add(StandardMaterial {
-                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., 1.)),
+                                    base_color: Color::Srgba(Srgba::new(1., 1., 1., msg.opacity)),
                                     unlit: true,
                                     alpha_mode: AlphaMode::Blend,
                                     ..default()
@@ -266,7 +270,7 @@ fn spawn_videos(
                 MeshMaterial3d(materials.add(StandardMaterial {
                     unlit: true,
                     base_color_texture: Some(handle),
-                    base_color: Color::WHITE,
+                    base_color: Color::WHITE.with_alpha(new.opacity),
                     alpha_mode: AlphaMode::Blend,
                     ..default()
                 })),
