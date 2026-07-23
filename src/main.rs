@@ -11,9 +11,7 @@ fn main() {
             kind: wayland_overlay_media_viewer::spawner::ObjectType::Image(PopupImage {
                 uri: line,
             }),
-            position: wayland_overlay_media_viewer::position::PopupPosition::Global(Vec3::new(
-                10.0, 1., 0.,
-            )),
+            position: wayland_overlay_media_viewer::position::PopupPosition::Random,
             popup_animation: wayland_overlay_media_viewer::spawner::PopupAnimation::SlideFadeIn,
             behaviour: wayland_overlay_media_viewer::spawner::PopupInteraction::ClickThough,
             opacity: 0.4,

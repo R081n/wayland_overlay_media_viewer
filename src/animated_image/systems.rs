@@ -16,13 +16,16 @@ pub(crate) struct GifInitialized;
 /// Initialize the [Gif]'s [Sprite] / [GifNode]'s [ImageNode] / [Gif3d]'s [MeshMaterial3d] with the first image of the sequence.
 pub(crate) fn initialize_gifs(
     mut commands: Commands,
-    mut gifs_q: Query<(
-        Entity,
-        Option<(&Gif, &mut Sprite)>,
-        Option<(&GifNode, &mut ImageNode)>,
-        Option<(&Gif3d, &mut MeshMaterial3d<StandardMaterial>)>,
-        &mut GifPlayer,
-    ), Without<GifInitialized>>,
+    mut gifs_q: Query<
+        (
+            Entity,
+            Option<(&Gif, &mut Sprite)>,
+            Option<(&GifNode, &mut ImageNode)>,
+            Option<(&Gif3d, &mut MeshMaterial3d<StandardMaterial>)>,
+            &mut GifPlayer,
+        ),
+        Without<GifInitialized>,
+    >,
     mut gifs: ResMut<Assets<GifAsset>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -45,7 +48,6 @@ pub(crate) fn initialize_gifs(
                 frame_end,
             } = asset.into_inner();
 
-        
             // Get first frame and load it to the sprite
             let _frame = frames.first().unwrap();
             let handle = handles.first().unwrap();

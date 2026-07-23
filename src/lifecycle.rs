@@ -1,7 +1,14 @@
-use bevy::prelude::*;
+use std::ops::{Add, Div, Mul, Sub};
+
+use bevy::{
+    math::{DVec2, I64Vec2, U64Vec2, VectorSpace},
+    prelude::*,
+};
+use bevy_rand::{global::GlobalRng, prelude::WyRand};
+use rand::RngExt;
 
 use crate::{
-    position::PopupPosition,
+    position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
     spawner::{ObjectMessage, TargetOpacity},
 };
 
@@ -11,7 +18,9 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
             commands.insert(Transform::from_translation(vec3));
         }
         PopupPosition::SceenSpace(_, _vec2) => todo!(),
-        PopupPosition::Random => todo!(),
+        PopupPosition::Random => {
+            commands.trigger(PlaceAtRandomPosition);
+        }
     }
 
     match msg.popup_animation {
@@ -32,7 +41,8 @@ pub struct LiveCyclePlugin;
 
 impl Plugin for LiveCyclePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, handle_slide_fade_in);
+        app.add_systems(Update, handle_slide_fade_in)
+            .add_observer(handle_random_position);
     }
 }
 
@@ -104,4 +114,68 @@ fn handle_slide_fade_in(
             commands.entity(id).remove::<SlideFadeInAnimation>();
         }
     }
+}
+
+#[derive(EntityEvent)]
+struct PlaceAtRandomPosition(Entity);
+
+fn handle_random_position(
+    trigger: On<PlaceAtRandomPosition>,
+    screens: Query<&ScreenPosition>,
+    mut objects: Query<&mut Transform>,
+    mut rng: Single<&mut WyRand, With<GlobalRng>>,
+) -> Result<(), BevyError> {
+    let mut obj = objects.get_mut(trigger.0)?;
+
+    let pixels_per_meter = PIXELS_PER_METER as f64;
+
+    // calculations in pixels so that every pixel can be hit
+
+    let mut image_size = (obj.scale.xy() * PIXELS_PER_METER).as_u64vec2();
+
+    // The total amount of possible pixel positions for this image
+    let mut total = (&screens)
+        .iter()
+        .map(|s| s.pixel_size.saturating_sub(image_size).element_product())
+        .sum::<u64>();
+
+    if total < 100 {
+        // The image is so large that we only have a very small fitting region
+        // let the image hang outside the window
+        total = (&screens)
+            .iter()
+            .map(|s| s.pixel_size.element_product())
+            .sum::<u64>();
+        image_size = U64Vec2::ZERO;
+    }
+
+    let mut rand = rng.random_range(..total);
+    let z = rng.random_range(..(1e10 as u64)) as f32 / 1e12;
+
+    for screen in screens.iter() {
+        let rect = screen.pixel_size.saturating_sub(image_size);
+        let size = rect.element_product();
+
+        if size < rand {
+            rand -= size;
+            dbg!((size, rand));
+            continue;
+        }
+
+        let x = rand / rect.y;
+        let y = rand % rect.y;
+
+        let pos = ((I64Vec2::new(x as i64, y as i64) + dbg!(screen.pixel_min))
+            .as_dvec2()
+            .add(image_size.div(2).as_dvec2())
+            / pixels_per_meter)
+            .as_vec2();
+        obj.translation.x = pos.x;
+        obj.translation.y = pos.y;
+        obj.translation.z = z;
+
+        break;
+    }
+
+    Ok(())
 }

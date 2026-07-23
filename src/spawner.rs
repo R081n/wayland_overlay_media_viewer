@@ -6,8 +6,8 @@ use std::{
 use crate::animated_image::{Gif3d, GifAsset};
 use crate::{
     lifecycle,
-    position::{PopupPosition, PIXELS_PER_METER},
-    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
+    position::{PIXELS_PER_METER, PopupPosition},
+    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 
@@ -197,13 +197,13 @@ fn spawn_object(
                 ObjectType::Video(_) => continue,
             };
 
-            lifecycle::insert_components(&mut common.commands, msg);
-
             common
                 .commands
                 .entry::<Transform>()
                 .or_default()
                 .and_modify(move |mut t| *t = t.with_scale(common.scale));
+
+            lifecycle::insert_components(&mut common.commands, msg);
         }
     }
 

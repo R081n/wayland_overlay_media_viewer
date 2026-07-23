@@ -1,6 +1,7 @@
 use std::io::ErrorKind;
 use std::{collections::HashSet, f32::consts::FRAC_PI_4};
 
+use bevy::math::{I64Vec2, U64Vec2};
 use bevy::{
     camera::{ImageRenderTarget, RenderTarget},
     prelude::*,
@@ -14,8 +15,8 @@ use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_l
 
 use crate::position::{PIXELS_PER_METER, ScreenPosition};
 use crate::{
-     PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
-    WallpaperTargetMonitor, backend::wayland::render::SurfaceDescriptorEntry,
+    PointerSample, WallpaperPointerState, WallpaperSurfaceInfo, WallpaperTargetMonitor,
+    backend::wayland::render::SurfaceDescriptorEntry,
 };
 
 use super::{
@@ -186,6 +187,8 @@ fn create_transform(entry: &SurfaceDescriptorEntry) -> (Transform, ScreenPositio
                 Vec2::new(center_x, center_y),
                 Vec2::new(w_target, h_target),
             ),
+            pixel_min: I64Vec2::new(entry.offset_x as i64, entry.offset_y as i64),
+            pixel_size: U64Vec2::new(entry.width as u64, entry.height as u64),
         },
     )
 }
@@ -228,6 +231,8 @@ fn spawn_camera(
                     Vec2::new(center_x, center_y),
                     Vec2::new(w_target, h_target),
                 ),
+                pixel_min: I64Vec2::new(config.offset_x as i64, config.offset_y as i64),
+                pixel_size: U64Vec2::new(config.width as u64, config.height as u64),
             },
             RenderTarget::Image(ImageRenderTarget {
                 handle: image,

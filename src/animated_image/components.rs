@@ -1,14 +1,14 @@
 use std::{convert::Infallible, time::Duration};
 
 use bevy::{
-    asset::{io::Reader, AssetLoader, LoadContext, RenderAssetUsages},
+    asset::{AssetLoader, LoadContext, RenderAssetUsages, io::Reader},
     prelude::*,
 };
 use image::{
+    AnimationDecoder as _, ImageError,
     codecs::{gif::GifDecoder, webp::WebPDecoder},
     imageops::resize,
     metadata::LoopCount,
-    AnimationDecoder as _, ImageError,
 };
 use thiserror::Error;
 use wgpu::{Extent3d, TextureDimension, TextureFormat};

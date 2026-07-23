@@ -26,6 +26,9 @@ ringbuf = "0.4"
 bevy_framepace = "0.22.0"
 thiserror = "2.0.17"
 crossbeam-channel = "0.5.16"
+bevy_rand = { version = "0.15.0", features = ["wyrand"] }
+rand_core = "0.10.1"
+rand = "0.10.2"
 
 [dependencies.bevy]
 version = "0.19"
