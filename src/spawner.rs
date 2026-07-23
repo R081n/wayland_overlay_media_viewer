@@ -3,11 +3,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::gif::{Gif3d, GifAsset};
+use crate::animated_image::{Gif3d, GifAsset};
 use crate::{
     lifecycle,
-    position::{PIXELS_PER_METER, PopupPosition},
-    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
+    position::{PopupPosition, PIXELS_PER_METER},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 
@@ -95,7 +95,7 @@ fn init_rect_mesh(mut meshes: ResMut<Assets<Mesh>>, mut default_meshes: ResMut<D
     default_meshes.rect = handle;
 }
 
-fn preload_asset(
+pub fn preload_asset(
     assets: ResMut<AssetServer>,
     mut new: MessageReader<ObjectMessage>,
     mut pendnig: ResMut<PendingAssets>,
@@ -147,8 +147,6 @@ fn spawn_object(
         .extract_if(|id, _| server.is_loaded_with_dependencies(id))
     {
         for msg in pending {
-            dbg!("spawn");
-
             let mut common = match &msg.kind {
                 ObjectType::Image(_) => {
                     if let Ok(asset) = id.clone().try_typed::<Image>() {

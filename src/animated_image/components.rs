@@ -138,7 +138,6 @@ impl AssetLoader for AnimationImageLoader {
         for frame_result in frames_iterator {
             let frame = frame_result?;
 
-            dbg!("frame");
             let duration = Duration::from(frame.delay());
 
             current_time += duration.as_secs_f64();

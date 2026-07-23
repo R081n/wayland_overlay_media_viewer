@@ -14,7 +14,7 @@ use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_l
 
 use crate::position::{PIXELS_PER_METER, ScreenPosition};
 use crate::{
-    PointerButton, PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
+     PointerSample, WallpaperPointerState, WallpaperSurfaceInfo,
     WallpaperTargetMonitor, backend::wayland::render::SurfaceDescriptorEntry,
 };
 
@@ -314,7 +314,7 @@ fn apply_pointer_events(
         sample.last_button = evt
             .kind
             .button_change()
-            .map(|(button, pressed)| PointerButton { button, pressed });
+            .map(|(button, pressed)| crate::PointerButton { button, pressed });
 
         if let Some(btn) = sample.last_button
             && let Some(button) = btn.button

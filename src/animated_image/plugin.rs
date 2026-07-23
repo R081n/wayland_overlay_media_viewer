@@ -1,15 +1,15 @@
 use bevy::prelude::*;
 
-use crate::gif::{
-    GifAsset,
+use crate::animated_image::{
     components::AnimationImageLoader,
     messages::GifDespawnMessage,
     systems::{animate_gifs, despawn_gifs, initialize_gifs},
+    GifAsset,
 };
 
-pub struct GifPlugin;
+pub struct AnimatedImagePlugin;
 
-impl Plugin for GifPlugin {
+impl Plugin for AnimatedImagePlugin {
     fn build(&self, app: &mut App) {
         app.init_asset::<GifAsset>();
         app.add_message::<GifDespawnMessage>();

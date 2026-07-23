@@ -6,7 +6,7 @@ use bevy::{
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 
-use crate::gif::{
+use crate::animated_image::{
     Gif3d, GifNode,
     {Gif, GifAsset, GifDespawn, GifPlayer, messages::GifDespawnMessage},
 };
