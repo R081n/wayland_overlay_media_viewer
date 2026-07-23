@@ -182,7 +182,7 @@ fn spawn_object(
                                     ..default()
                                 })),
                             )),
-                            scale: Vec3::new(image.width() as f32, image.height() as f32, 0.)
+                            scale: Vec3::new(image.width() as f32, image.height() as f32, 1.)
                                 / PIXELS_PER_METER,
                         }
                     } else if let Ok(asset) = id.clone().try_typed::<GifAsset>() {
@@ -206,7 +206,7 @@ fn spawn_object(
                                     ..default()
                                 })),
                             )),
-                            scale: scale.extend(0.) / PIXELS_PER_METER,
+                            scale: scale.extend(1.) / PIXELS_PER_METER,
                         }
                     } else {
                         continue;
@@ -307,7 +307,7 @@ fn wait_for_video_to_load(
 
         let target = images.get(target.handle.id()).unwrap();
 
-        let scale = Vec3::new(target.width() as f32, target.height() as f32, 0.) / PIXELS_PER_METER;
+        let scale = Vec3::new(target.width() as f32, target.height() as f32, 1.) / PIXELS_PER_METER;
 
         commands
             .entry::<Transform>()

@@ -1,13 +1,19 @@
 use std::{
     ops::{Add, Div},
+    sync::atomic::{AtomicI64, AtomicU64},
     time::Duration,
 };
 
-use bevy::{math::I64Vec2, prelude::*};
+use bevy::{
+    ecs::{self},
+    math::I64Vec2,
+    prelude::*,
+};
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
+    draw_order::DrawOrder,
     position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
     spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
 };
@@ -42,15 +48,12 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
         });
     }
 
-    commands.insert(TargetOpacity(msg.opacity));
+    static NEXT_ID: AtomicI64 = AtomicI64::new(0);
 
-    let id = commands.id().index_u32() as f32;
-    dbg!(id);
-
-    commands
-        .entry::<Transform>()
-        .or_default()
-        .and_modify(move |mut t| t.translation.z = (id / 100.) - 10.0);
+    commands.insert((
+        TargetOpacity(msg.opacity),
+        DrawOrder(NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)),
+    ));
 }
 
 pub struct LiveCyclePlugin;

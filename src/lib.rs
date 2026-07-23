@@ -4,6 +4,7 @@
 pub mod animated_image;
 mod backend;
 pub mod cleanup;
+mod draw_order;
 pub mod images;
 pub mod lifecycle;
 pub mod position;
@@ -23,7 +24,12 @@ use bevy::{
     },
     image::ImagePlugin,
     pbr::PbrPlugin,
-    render::pipelined_rendering::PipelinedRenderingPlugin,
+    render::{
+        pipelined_rendering::PipelinedRenderingPlugin,
+        settings::{RenderCreation, WgpuSettings},
+        sync_world::SyncWorldPlugin,
+        RenderPlugin,
+    },
     window::WindowPlugin,
     winit::WinitPlugin,
     DefaultPlugins,
@@ -34,6 +40,7 @@ use crossbeam_channel::{Receiver, Sender};
 
 use crate::{
     animated_image::AnimatedImagePlugin,
+    draw_order::CustomDrawOrderPlugin,
     lifecycle::LiveCyclePlugin,
     spawner::{preload_asset, ObjectMessage, PopupPlugin},
     videos::plugin::VideoPlugin,
@@ -103,6 +110,7 @@ fn startup_inner(rx: DataReceiver) {
         FramepacePlugin,
         LiveCyclePlugin,
         AnimatedImagePlugin,
+        CustomDrawOrderPlugin,
         EntropyPlugin::<WyRand>::default(),
     ));
 
