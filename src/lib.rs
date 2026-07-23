@@ -38,6 +38,7 @@ use crate::{
     videos::plugin::VideoPlugin,
 };
 
+#[derive(Clone)]
 pub struct AppHandle {
     new_objects: Sender<ObjectMessage>,
 }

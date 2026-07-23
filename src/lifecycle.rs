@@ -1,15 +1,15 @@
-use std::ops::{Add, Div};
-
-use bevy::{
-    math::I64Vec2,
-    prelude::*,
+use std::{
+    ops::{Add, Div},
+    time::Duration,
 };
+
+use bevy::{math::I64Vec2, prelude::*};
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
     position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
-    spawner::{ObjectMessage, TargetOpacity},
+    spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
 };
 
 pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) {
@@ -24,14 +24,19 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
     }
 
     match msg.popup_animation {
-        crate::spawner::PopupAnimation::None => {}
-        crate::spawner::PopupAnimation::SlideFadeIn => {
+        crate::spawner::PopupInAnimation::None => {}
+        crate::spawner::PopupInAnimation::SlideFadeIn => {
             commands.insert(SlideFadeInAnimation::new());
         }
     }
 
-    match msg.behaviour {
-        crate::spawner::PopupInteraction::ClickThough => {}
+    let close = &msg.close_condition;
+    if let Some(duration) = close.duration {
+        commands.trigger(|entity| CloseInDuration {
+            entity,
+            duration,
+            kind: msg.close_animation,
+        });
     }
 
     commands.insert(TargetOpacity(msg.opacity));
@@ -41,8 +46,9 @@ pub struct LiveCyclePlugin;
 
 impl Plugin for LiveCyclePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, handle_slide_fade_in)
-            .add_observer(handle_random_position);
+        app.add_systems(Update, (handle_slide_fade_in, handle_closing))
+            .add_observer(handle_random_position)
+            .add_observer(on_close_in);
     }
 }
 
@@ -75,10 +81,10 @@ fn handle_slide_fade_in(
     )>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    const DISTANCE: f32 = 1.0;
+    const DISTANCE: f32 = 0.2;
     for (id, mut transform, mesh_material3d, mut animation, target_opacity) in objects.iter_mut() {
         if !animation.started {
-            transform.translation.z -= DISTANCE;
+            transform.scale -= DISTANCE;
             animation.start_depth = transform.translation.z;
             animation.started = true;
 
@@ -95,7 +101,7 @@ fn handle_slide_fade_in(
         let current_percent = ExponentialOutCurve.sample(animation.progress).unwrap_or(1.);
         let current = current_percent * DISTANCE;
         let diff = current - last;
-        transform.translation.z += diff;
+        transform.scale += diff;
 
         if let Some(mut mat) = materials.get_mut(mesh_material3d.id()) {
             mat.base_color = mat
@@ -169,7 +175,7 @@ fn handle_random_position(
         let x = rng.random_range(x_range);
         let y = rng.random_range(y_range);
 
-        let pos = ((I64Vec2::new(x as i64, y as i64) + dbg!(screen.pixel_min))
+        let pos = ((I64Vec2::new(x as i64, y as i64) + screen.pixel_min)
             .as_dvec2()
             .add(image_size.div(2).as_dvec2())
             / pixels_per_meter)
@@ -182,4 +188,49 @@ fn handle_random_position(
     }
 
     Ok(())
+}
+
+#[derive(EntityEvent)]
+struct CloseInDuration {
+    entity: Entity,
+    duration: Duration,
+    kind: PopupOutAnimation,
+}
+
+fn on_close_in(trigger: On<CloseInDuration>, mut commands: Commands) {
+    commands
+        .delayed()
+        .duration(trigger.duration)
+        .entity(trigger.entity)
+        .try_insert(Closing { kind: trigger.kind });
+}
+
+#[derive(Component, Default)]
+struct Closing {
+    kind: PopupOutAnimation,
+}
+
+fn handle_closing(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut closing: Query<(Entity, &Closing, &mut MeshMaterial3d<StandardMaterial>)>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for (id, closing, handle) in closing.iter_mut() {
+        match closing.kind {
+            PopupOutAnimation::None => commands.entity(id).despawn(),
+            PopupOutAnimation::FadeOut => {
+                let delta = time.delta_secs();
+                if let Some(mut mat) = materials.get_mut(handle.id()) {
+                    let mut alpha = mat.base_color.alpha();
+                    if alpha < 0.001 {
+                        commands.entity(id).despawn();
+                    }
+
+                    (&mut alpha).smooth_nudge(&0.0, 10., delta);
+                    mat.base_color.set_alpha(alpha);
+                }
+            }
+        }
+    }
 }

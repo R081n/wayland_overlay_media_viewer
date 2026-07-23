@@ -1,6 +1,7 @@
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use crate::animated_image::{Gif3d, GifAsset};
@@ -11,14 +12,25 @@ use crate::{
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 
-#[derive(Message, Clone)]
+#[derive(Message, Clone, Debug)]
 pub struct ObjectMessage {
     pub kind: ObjectType,
     pub position: PopupPosition,
-    pub popup_animation: PopupAnimation,
+    pub popup_animation: PopupInAnimation,
+    pub close_animation: PopupOutAnimation,
     pub behaviour: PopupInteraction,
+    pub close_condition: ObjectCloseCondition,
     pub opacity: f32,
 }
+
+#[derive(Clone, Debug)]
+pub struct ObjectCloseCondition {
+    pub duration: Option<Duration>,
+    pub click: Option<CloseClickSettings>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CloseClickSettings {}
 
 #[derive(Component)]
 pub struct TargetOpacity(pub f32);
@@ -37,9 +49,16 @@ pub enum PopupInteraction {
 }
 
 #[derive(Debug, Clone)]
-pub enum PopupAnimation {
+pub enum PopupInAnimation {
     None,
     SlideFadeIn,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub enum PopupOutAnimation {
+    #[default]
+    None,
+    FadeOut,
 }
 
 #[derive(Debug, Clone)]
