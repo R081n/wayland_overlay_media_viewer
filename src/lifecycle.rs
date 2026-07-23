@@ -130,40 +130,44 @@ fn handle_random_position(
     let pixels_per_meter = PIXELS_PER_METER as f64;
 
     // calculations in pixels so that every pixel can be hit
-
     let mut image_size = (obj.scale.xy() * PIXELS_PER_METER).as_u64vec2();
 
     // The total amount of possible pixel positions for this image
-    let mut total = (&screens)
+    let total = (&screens)
         .iter()
-        .map(|s| s.pixel_size.saturating_sub(image_size).element_product())
+        .map(|s| s.pixel_size.element_product())
         .sum::<u64>();
-
-    if total < 100 {
-        // The image is so large that we only have a very small fitting region
-        // let the image hang outside the window
-        total = (&screens)
-            .iter()
-            .map(|s| s.pixel_size.element_product())
-            .sum::<u64>();
-        image_size = U64Vec2::ZERO;
-    }
 
     let mut rand = rng.random_range(..total);
     let z = rng.random_range(..(1e10 as u64)) as f32 / 1e12;
 
     for screen in screens.iter() {
-        let rect = screen.pixel_size.saturating_sub(image_size);
+        let rect = screen.pixel_size;
+
+        if image_size.x > rect.x {
+            image_size.x = 0;
+        }
+
+        if image_size.y > rect.y {
+            image_size.y = 0;
+        }
+
         let size = rect.element_product();
 
         if size < rand {
             rand -= size;
-            dbg!((size, rand));
             continue;
         }
 
         let x = rand / rect.y;
         let y = rand % rect.y;
+
+        // Make the chance a pixel is hit uniform for better coverage
+        let x_range = (x.saturating_sub(image_size.x))..=((rect.x - image_size.x).min(x));
+        let y_range = (y.saturating_sub(image_size.y))..=((rect.y - image_size.y).min(y));
+
+        let x = rng.random_range(x_range);
+        let y = rng.random_range(y_range);
 
         let pos = ((I64Vec2::new(x as i64, y as i64) + dbg!(screen.pixel_min))
             .as_dvec2()
