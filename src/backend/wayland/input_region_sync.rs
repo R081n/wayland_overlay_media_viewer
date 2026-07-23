@@ -1,17 +1,17 @@
 use bevy::{camera::primitives::Aabb, prelude::*, window::RawHandleWrapper};
 use raw_window_handle::{RawWindowHandle, WaylandWindowHandle};
 use wayland_client::{
+    Proxy,
     protocol::{
         wl_compositor, wl_region,
         wl_surface::{self, WlSurface},
     },
-    Proxy,
 };
 
 use crate::{
     backend::wayland::{
-        backend::{wayland_event_system, WaylandEventQueue},
         WaylandAppState,
+        backend::{WaylandEventQueue, wayland_event_system},
     },
     position::ScreenPosition,
 };
@@ -84,7 +84,6 @@ fn update_layer_shell_input_regions(
             {
                 // Wayland coordinates use logical pixels, matching Bevy's screen space values.
                 // region.add takes: x, y, width, height
-                dbg!("region", rect);
                 region.add(
                     rect.min.x as i32,
                     rect.min.y as i32,

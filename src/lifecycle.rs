@@ -9,10 +9,10 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    draw_order::DrawOrder,
-    position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
-    spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
     Clickable,
+    draw_order::DrawOrder,
+    position::{PIXELS_PER_METER, PopupPosition, ScreenPosition},
+    spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
 };
 
 pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) {
@@ -46,10 +46,10 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
     }
 
     match msg.behaviour {
-        crate::spawner::PopupInteraction::ClickThough => {
+        crate::spawner::PopupInteraction::ClickThough => {}
+        crate::spawner::PopupInteraction::Clickable => {
             commands.insert(Clickable);
         }
-        crate::spawner::PopupInteraction::Clickable => {}
     }
 
     static NEXT_ID: AtomicI64 = AtomicI64::new(0);

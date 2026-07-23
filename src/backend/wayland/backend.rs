@@ -3,6 +3,7 @@ use std::{collections::HashSet, f32::consts::FRAC_PI_4};
 
 use bevy::light::cluster::ClusterConfig;
 use bevy::math::{I64Vec2, U64Vec2};
+use bevy::picking::pointer::{Location, PointerAction, PointerInput};
 use bevy::render::view::NoIndirectDrawing;
 use bevy::{
     camera::{ImageRenderTarget, RenderTarget},
@@ -97,6 +98,7 @@ pub fn wayland_event_system(
     mut surface_info: ResMut<WallpaperSurfaceInfo>,
     mut cameras: Query<(&WaylandRenderTarget, &mut Transform, &mut ScreenPosition)>,
     mut images: ResMut<Assets<Image>>,
+    mut pointer_writer: MessageWriter<PointerInput>,
 ) {
     if app_state.is_running() {
         if let Err(err) = pump_wayland_events(&mut event_queue, &mut app_state) {
@@ -154,6 +156,8 @@ pub fn wayland_event_system(
         apply_pointer_events(
             &mut pointer_state,
             app_state.pending_pointer_events.drain(..),
+            &mut pointer_writer,
+            &mut cameras,
         );
 
         if !had_pointer_events && let Some(sample) = pointer_state.last.as_mut() {
@@ -294,6 +298,8 @@ fn ready_bounds(
 fn apply_pointer_events(
     state: &mut WallpaperPointerState,
     pending: impl IntoIterator<Item = PendingPointerEvent>,
+    writer: &mut MessageWriter<PointerInput>,
+    cameras: &mut Query<(&WaylandRenderTarget, &mut Transform, &mut ScreenPosition)>,
 ) {
     for evt in pending {
         let prev_position = state
@@ -310,6 +316,33 @@ fn apply_pointer_events(
             ..state.last.clone().unwrap_or_default()
         };
 
+        let Some(target) = cameras
+            .iter()
+            .find(|(_, _, p)| p.output == evt.output)
+            .map(|(t, _, _)| t.image.clone())
+        else {
+            continue;
+        };
+
+        let mut write = |action: PointerAction| {
+            writer.write(PointerInput {
+                pointer_id: bevy::picking::pointer::PointerId::Mouse,
+                location: Location {
+                    position: new_position,
+                    target: bevy::camera::NormalizedRenderTarget::Image(ImageRenderTarget {
+                        handle: target.clone(),
+                        scale_factor: 1.0,
+                    }),
+                },
+                action,
+            });
+        };
+        if new_position != prev_position {
+            write(PointerAction::Move {
+                delta: new_position - prev_position,
+            });
+        }
+
         sample.last_button = evt
             .kind
             .button_change()
@@ -320,8 +353,20 @@ fn apply_pointer_events(
         {
             if btn.pressed {
                 sample.pressed.insert(button);
+                write(PointerAction::Press(match button {
+                    MouseButton::Left => PointerButton::Primary,
+                    MouseButton::Right => PointerButton::Secondary,
+                    MouseButton::Middle => PointerButton::Middle,
+                    _ => continue,
+                }));
             } else {
                 sample.pressed.remove(&button);
+                write(PointerAction::Release(match button {
+                    MouseButton::Left => PointerButton::Primary,
+                    MouseButton::Right => PointerButton::Secondary,
+                    MouseButton::Middle => PointerButton::Middle,
+                    _ => continue,
+                }));
             }
         }
 

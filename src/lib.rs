@@ -6,7 +6,9 @@ mod backend;
 pub mod cleanup;
 mod draw_order;
 pub mod images;
+pub mod interaction;
 pub mod lifecycle;
+pub mod pointer_visualization_plugin;
 pub mod position;
 pub mod spawner;
 pub mod videos;
@@ -25,6 +27,7 @@ use bevy::{
     },
     image::ImagePlugin,
     pbr::PbrPlugin,
+    picking::mesh_picking::MeshPickingPlugin,
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::WindowPlugin,
     winit::WinitPlugin,
@@ -36,7 +39,9 @@ use crossbeam_channel::{Receiver, Sender};
 use crate::{
     animated_image::AnimatedImagePlugin,
     draw_order::CustomDrawOrderPlugin,
+    interaction::PopupInteractionPlugin,
     lifecycle::LiveCyclePlugin,
+    pointer_visualization_plugin::PointerVisualizerPlugin,
     spawner::{ObjectMessage, PopupPlugin, preload_asset},
     videos::plugin::VideoPlugin,
 };
@@ -106,6 +111,9 @@ fn startup_inner(rx: DataReceiver) {
         LiveCyclePlugin,
         AnimatedImagePlugin,
         CustomDrawOrderPlugin,
+        PopupInteractionPlugin,
+        PointerVisualizerPlugin,
+        MeshPickingPlugin,
         EntropyPlugin::<WyRand>::default(),
     ));
 
