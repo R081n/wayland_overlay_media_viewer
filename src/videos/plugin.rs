@@ -113,7 +113,7 @@ fn handle_playing_state(
                 } else if data.pts > *pts {
                     let dt = (data.pts - *pts) / 1_000_000;
                     // Clamp dt to reasonable range (1ms - 100ms)
-                    let dt = dt.max(1).min(100);
+                    let dt = dt.clamp(1, 100);
                     player_time.set_duration(Duration::from_millis(dt));
                     *pts = data.pts;
                 } else {

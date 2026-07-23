@@ -211,16 +211,16 @@ impl FfmpegPlayer {
 
                     // Handle underrun for remaining samples
                     if read < data.len() {
-                        for i in read..data.len() {
+                        for (i, item) in data.iter_mut().enumerate().skip(read){
                             underrun_fade *= 0.98;
                             if channels == 2 {
                                 if i % 2 == 0 {
-                                    data[i] = last_left * underrun_fade;
+                                    *item = last_left * underrun_fade;
                                 } else {
-                                    data[i] = last_right * underrun_fade;
+                                    *item = last_right * underrun_fade;
                                 }
                             } else {
-                                data[i] = last_left * underrun_fade;
+                                *item = last_left * underrun_fade;
                             }
                         }
                     }

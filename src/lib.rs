@@ -68,10 +68,11 @@ fn startup_inner(rx: DataReceiver) {
 
     app.add_systems(Update, videos::plugin::render_video_frame);
 
-    let mut window_plugin = WindowPlugin::default();
-
-    window_plugin.primary_window = None;
-    window_plugin.exit_condition = bevy::window::ExitCondition::DontExit;
+    let window_plugin = WindowPlugin {
+        primary_window: None,
+        exit_condition: bevy::window::ExitCondition::DontExit,
+        ..Default::default()
+    };
 
     app.add_plugins((
         DefaultPlugins
