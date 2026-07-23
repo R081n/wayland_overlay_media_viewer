@@ -303,7 +303,6 @@ fn wait_for_video_to_load(
 
         let mut commands = commands.entity(id);
         commands.remove::<VideoDeferredObjectMessage>();
-        lifecycle::insert_components(&mut commands, msg);
 
         let target = images.get(target.handle.id()).unwrap();
 
@@ -313,6 +312,8 @@ fn wait_for_video_to_load(
             .entry::<Transform>()
             .or_default()
             .and_modify(move |mut t| *t = t.with_scale(scale));
+
+        lifecycle::insert_components(&mut commands, msg);
     }
 
     Ok(())
