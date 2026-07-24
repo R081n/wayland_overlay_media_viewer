@@ -12,10 +12,7 @@ use bevy::{
 };
 
 use crate::{
-    Clickable,
-    draw_order::DrawOrder,
-    lifecycle::{CloseOnClick, Closing, get_new_topmost_id},
-    spawner::PopupLayer,
+    Clickable, RequestInputRecalc, draw_order::DrawOrder, lifecycle::{CloseOnClick, Closing, get_new_topmost_id}, spawner::PopupLayer,
 };
 
 pub struct PopupInteractionPlugin;
@@ -151,6 +148,7 @@ fn on_right_dragging(
         Option<&RightResizing>,
     )>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
 ) {
     let event = trigger.event();
     let Ok((mut transform, dragging, resizing)) = dragged_entities.get_mut(trigger.entity) else {
@@ -202,6 +200,7 @@ fn on_right_dragging(
                     // The new center moves dynamically relative to the completely frozen top-left corner
                     transform.scale = new_scale;
                     transform.translation = resize.top_left_world_anchor + current_anchor_to_center;
+                     input_recalc.request();
                 }
             }
         }
@@ -229,6 +228,7 @@ fn on_right_dragging(
                 let distance = (original_hit_point - ray.origin).dot(*camera_forward) / denominator;
                 let current_ray_intersection = ray.origin + ray.direction * distance;
                 transform.translation = current_ray_intersection + drag.initial_offset;
+                input_recalc.request();
             }
         }
     }

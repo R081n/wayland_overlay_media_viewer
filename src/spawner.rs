@@ -7,12 +7,13 @@ use std::{
 use crate::{
     animated_image::{Gif3d, GifAsset},
     lifecycle::handle_slide_fade_in,
-    shader::{DynamicMaterial, SHADER_TEMPLATE, ShaderRepeatPeriod},
+    shader::{DynamicMaterial, ShaderRepeatPeriod, SHADER_TEMPLATE},
+    texts::TextAnchor,
 };
 use crate::{
     lifecycle,
-    position::{PIXELS_PER_METER, PopupPosition},
-    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
+    position::{PopupPosition, PIXELS_PER_METER},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 
@@ -25,6 +26,7 @@ pub struct ObjectMessage {
     pub close_animation: PopupOutAnimation,
     pub behaviour: PopupInteraction,
     pub close_condition: ObjectCloseCondition,
+    pub movement: Movement,
     pub opacity: f32,
 }
 
@@ -47,12 +49,16 @@ pub struct CloseClickSettings {}
 #[derive(Component)]
 pub struct TargetOpacity(pub f32);
 
+/// For text objects to copy the opacity
+#[derive(Component)]
+pub struct ProxyOpacity(pub f32);
+
 #[derive(Debug, Clone)]
 pub enum ObjectType {
     Image(PopupImage),
     Video(PopupVideo),
     Shader(CustomShaderSource),
-    // Text,
+    Text(TextPopup),
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +83,12 @@ pub enum PopupOutAnimation {
 }
 
 #[derive(Debug, Clone)]
+pub enum Movement {
+    None,
+    Linear(Vec2),
+}
+
+#[derive(Debug, Clone)]
 pub struct PopupImage {
     pub uri: String,
 }
@@ -98,6 +110,13 @@ pub struct CustomShaderSource {
     pub code: String,
     pub duraton: f32,
 }
+
+#[derive(Debug, Clone, Component)]
+pub struct TextPopup {
+    pub text: String,
+    pub color: Color,
+    pub font: TextFont,
+}
 pub struct PopupPlugin;
 
 impl Plugin for PopupPlugin {
@@ -113,7 +132,9 @@ impl Plugin for PopupPlugin {
                     spawn_object,
                     spawn_videos,
                     spawn_shaders,
+                    spawn_text,
                     wait_for_video_to_load,
+                    wait_for_text_to_have_size,
                 )
                     .chain()
                     .before(handle_slide_fade_in),
@@ -157,6 +178,7 @@ pub fn preload_asset(
             // Handeled differently
             ObjectType::Video(_) => continue,
             ObjectType::Shader(_) => continue,
+            ObjectType::Text(_) => continue,
         };
 
         pendnig
@@ -234,6 +256,7 @@ fn spawn_object(
                 // Not handled here
                 ObjectType::Video(_) => continue,
                 ObjectType::Shader(_) => continue,
+                ObjectType::Text(_) => continue,
             };
 
             common
@@ -362,5 +385,51 @@ fn spawn_shaders(
         ));
 
         lifecycle::insert_components(&mut commands, new);
+    }
+}
+
+#[derive(Component)]
+struct DeferredText(ObjectMessage);
+
+fn spawn_text(
+    mut commands: Commands,
+    mut new: MessageReader<ObjectMessage>,
+    default_meshes: Res<DefaultMeshes>,
+) {
+    for new in new.read() {
+        let ObjectType::Text(text) = &new.kind else {
+            continue;
+        };
+
+        let mut new = new.clone();
+
+        // Can't show text in background
+        new.layer = PopupLayer::Above;
+        let mut commands = commands.spawn((
+            Mesh3d(default_meshes.rect.clone()),
+            text.clone(),
+            Transform::from_scale(Vec3::ONE).with_translation(Vec3::ONE * -100.0),
+            DeferredText(new.clone()),
+        ));
+
+        lifecycle::insert_components(&mut commands, &new);
+    }
+}
+
+fn wait_for_text_to_have_size(
+    mut commands: Commands,
+    mut text_query: Query<&ComputedNode>,
+    target_query: Query<(Entity, &TextAnchor, &DeferredText)>,
+) {
+    for (entity, anchor, defferend_text) in target_query {
+        for n_entity in anchor.iter() {
+            let computed = text_query.get_mut(n_entity).unwrap();
+
+            if computed.size() != Vec2::ZERO {
+                let mut commands = commands.entity(entity);
+                commands.remove::<DeferredText>();
+                lifecycle::insert_components(&mut commands, &defferend_text.0);
+            }
+        }
     }
 }

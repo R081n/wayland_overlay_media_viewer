@@ -11,10 +11,10 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    Clickable,
     draw_order::DrawOrder,
-    position::{FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition},
-    spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, TargetOpacity},
+    position::{FullScreenMode, PopupPosition, ScreenPosition, PIXELS_PER_METER},
+    spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, ProxyOpacity, TargetOpacity},
+    Clickable, RequestInputRecalc,
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);
@@ -109,7 +109,11 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         }
     }
 
-    commands.insert((TargetOpacity(msg.opacity), get_new_topmost_id(msg.layer)));
+    commands.insert((
+        TargetOpacity(msg.opacity),
+        ProxyOpacity(msg.opacity),
+        get_new_topmost_id(msg.layer),
+    ));
 }
 
 pub struct LiveCyclePlugin;
@@ -146,21 +150,26 @@ pub(crate) fn handle_slide_fade_in(
     mut objects: Query<(
         Entity,
         &mut Transform,
-        &MeshMaterial3d<StandardMaterial>,
+        Option<&MeshMaterial3d<StandardMaterial>>,
         &mut SlideFadeInAnimation,
+        &mut ProxyOpacity,
         &TargetOpacity,
     )>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
 ) {
     const DISTANCE: f32 = 0.2;
-    for (id, mut transform, mesh_material3d, mut animation, target_opacity) in objects.iter_mut() {
+    for (id, mut transform, mesh_material3d, mut animation, mut proxy_opacity, target_opacity) in
+        objects.iter_mut()
+    {
         if !animation.started {
             transform.scale -= DISTANCE;
             animation.started = true;
 
-            if let Some(mut mat) = materials.get_mut(mesh_material3d.id()) {
+            if let Some(mut mat) = mesh_material3d.and_then(|m| materials.get_mut(m.id())) {
                 mat.base_color = mat.base_color.to_srgba().with_alpha(0.0).into();
             }
+            proxy_opacity.0 = 0.0;
             continue;
         }
 
@@ -172,19 +181,18 @@ pub(crate) fn handle_slide_fade_in(
         let current = current_percent * DISTANCE;
         let diff = current - last;
         transform.scale += diff;
+        input_recalc.request();
 
-        if let Some(mut mat) = materials.get_mut(mesh_material3d.id()) {
-            mat.base_color = mat
-                .base_color
-                .to_srgba()
-                .with_alpha(
-                    ExponentialOutCurve
-                        .sample(animation.progress)
-                        .unwrap_or(1.0)
-                        * target_opacity.0,
-                )
-                .into();
+        let alpha = ExponentialOutCurve
+            .sample(animation.progress)
+            .unwrap_or(1.0)
+            * target_opacity.0;
+
+        if let Some(mut mat) = mesh_material3d.and_then(|m| materials.get_mut(m.id())) {
+            mat.base_color = mat.base_color.to_srgba().with_alpha(alpha).into();
         }
+
+        proxy_opacity.0 = alpha;
 
         if animation.progress == 1.0 {
             commands.entity(id).remove::<SlideFadeInAnimation>();
@@ -200,6 +208,7 @@ fn handle_random_position(
     screens: Query<&ScreenPosition>,
     mut objects: Query<&mut Transform>,
     mut rng: Single<&mut WyRand, With<GlobalRng>>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
 ) -> Result<(), BevyError> {
     let mut obj = objects.get_mut(trigger.0)?;
 
@@ -250,6 +259,7 @@ fn handle_random_position(
             / pixels_per_meter)
             .as_vec2();
         obj.translation = pos.extend(0.0);
+        input_recalc.request();
 
         break;
     }
@@ -283,26 +293,40 @@ fn handle_closing(
     mut closing: Query<
         (
             Entity,
-            &mut MeshMaterial3d<StandardMaterial>,
+            Option<&MeshMaterial3d<StandardMaterial>>,
             &PopupOutAnimation,
+            Has<Clickable>,
+            &mut ProxyOpacity,
         ),
         With<Closing>,
     >,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
 ) {
-    for (id, handle, animation) in closing.iter_mut() {
+    for (id, handle, animation, clickable, mut proxy_opacity) in closing.iter_mut() {
         match *animation {
-            PopupOutAnimation::None => commands.entity(id).despawn(),
+            PopupOutAnimation::None => {
+                commands.entity(id).despawn();
+                input_recalc.request();
+            }
             PopupOutAnimation::FadeOut { decay_rate } => {
                 let delta = time.delta_secs();
-                if let Some(mut mat) = materials.get_mut(handle.id()) {
-                    let mut alpha = mat.base_color.alpha();
-                    if alpha < 0.000001 {
-                        commands.entity(id).despawn();
-                    }
 
-                    alpha.smooth_nudge(&0.0, decay_rate, delta);
-                    mat.base_color.set_alpha(alpha);
+                if proxy_opacity.0 < 0.000001 {
+                    commands.entity(id).despawn();
+                    input_recalc.request();
+                }
+
+                if clickable && proxy_opacity.0 < 0.1 {
+                    commands.entity(id).remove::<Clickable>().insert(Pickable {
+                        is_hoverable: false,
+                        should_block_lower: false,
+                    });
+                }
+
+                proxy_opacity.0.smooth_nudge(&0.0, decay_rate, delta);
+                if let Some(mut mat) = handle.and_then(|m| materials.get_mut(m.id())) {
+                    mat.base_color.set_alpha(proxy_opacity.0);
                 }
             }
         }
@@ -321,6 +345,7 @@ fn place_at_sceen_pos(
     trigger: On<PlaceAtScreenPos>,
     mut objects: Query<&mut Transform>,
     screens: Query<&ScreenPosition>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
 ) -> Result<(), BevyError> {
     let screen = screens
         .iter()
@@ -339,6 +364,7 @@ fn place_at_sceen_pos(
 
     object.translation = center.extend(-1.0);
     object.scale = scale.extend(1.0);
+    input_recalc.request();
 
     Ok(())
 }
@@ -353,11 +379,13 @@ fn scale_to_fit(source: Vec2, target: Vec2) -> Vec2 {
 
 fn make_visible_on_the_second_frame(
     mut commands: Commands,
-    mut visibility: Query<(Entity, &mut Visibility), With<SetPopupVisibleNextFrame>>,
+    mut popup: Query<(Entity, &mut Visibility), With<SetPopupVisibleNextFrame>>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
 ) {
-    for (id, mut vis) in &mut visibility {
+    for (id, mut vis) in &mut popup {
         *vis = Visibility::Visible;
 
         commands.entity(id).remove::<SetPopupVisibleNextFrame>();
+        input_recalc.request();
     }
 }

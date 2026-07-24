@@ -17,9 +17,8 @@ use std::time::Duration;
 
 pub use backend::*;
 use bevy::{
-    DefaultPlugins,
     app::{App, PluginGroup as _, PreUpdate, Startup, TerminalCtrlCHandlerPlugin, Update},
-    asset::{AssetPlugin, io::web::WebAssetPlugin},
+    asset::{io::web::WebAssetPlugin, AssetPlugin},
     camera::ClearColor,
     color::Color,
     dev_tools::picking_debug::DebugPickingMode,
@@ -34,6 +33,7 @@ use bevy::{
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::WindowPlugin,
     winit::WinitPlugin,
+    DefaultPlugins,
 };
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
@@ -46,7 +46,7 @@ use crate::{
     lifecycle::LiveCyclePlugin,
     position::ScreenPosition,
     shader::DynamicShaderPlugin,
-    spawner::{ObjectMessage, PopupPlugin, preload_asset},
+    spawner::{preload_asset, ObjectMessage, PopupPlugin},
     texts::TextOverlayPlugin,
     videos::plugin::VideoPlugin,
 };
@@ -62,8 +62,11 @@ pub struct DataReceiver {
 }
 
 impl AppHandle {
-    pub fn send(&self, msg: ObjectMessage) {
-        _ = self.new_objects.send(msg);
+    pub fn send(
+        &self,
+        msg: ObjectMessage,
+    ) -> std::prelude::v1::Result<(), crossbeam_channel::SendError<ObjectMessage>> {
+        self.new_objects.send(msg)
     }
 }
 

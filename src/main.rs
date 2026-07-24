@@ -1,14 +1,18 @@
 use std::time::Duration;
 
-use bevy::math::{Vec2, VectorSpace};
+use bevy::{
+    color::{Color, Srgba},
+    math::{Vec2, VectorSpace},
+};
 use rand::seq::SliceRandom;
 use wayland_overlay_media_viewer::{
     position::{FullScreenMode, PopupPosition},
     spawner::{
-        CloseClickSettings, ObjectCloseCondition, ObjectMessage, ObjectType, PopupImage,
-        PopupInAnimation, PopupInteraction, PopupLayer, PopupOutAnimation, PopupVideo,
+        CloseClickSettings, Movement, ObjectCloseCondition, ObjectMessage, ObjectType, PopupImage,
+        PopupInAnimation, PopupInteraction, PopupLayer, PopupOutAnimation, PopupVideo, TextPopup,
     },
 };
+use wgpu::PredefinedColorSpace::Srgb;
 
 fn main() {
     let sender = wayland_overlay_media_viewer::startup();
@@ -34,6 +38,54 @@ fn main() {
     //     },
     // });
 
+    _ = sender.send(ObjectMessage {
+        kind: ObjectType::Text(TextPopup {
+            text: "this is my very fun text".to_owned(),
+            color: Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)),
+            font: bevy::text::TextFont {
+                font_size: bevy::text::FontSize::Px(30.0),
+                ..Default::default()
+            },
+        }),
+        position: PopupPosition::Random,
+        layer: PopupLayer::Above,
+        popup_animation: PopupInAnimation::None,
+        behaviour: PopupInteraction::Clickable,
+        opacity: 1.0,
+        close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+        close_condition: ObjectCloseCondition {
+            duration: None,
+            click: Some(CloseClickSettings::default()),
+        },
+        movement: Movement::Linear(Vec2::new(1., 0.0)),
+    });
+
+    let clone = sender.clone();
+
+    std::thread::spawn(move || loop {
+        _ = clone.send(ObjectMessage {
+            kind: ObjectType::Text(TextPopup {
+                text: "this is my very fun text".to_owned(),
+                color: Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)),
+                font: bevy::text::TextFont {
+                    font_size: bevy::text::FontSize::Px(30.0),
+                    ..Default::default()
+                },
+            }),
+            position: PopupPosition::Random,
+            layer: PopupLayer::Above,
+            popup_animation: PopupInAnimation::None,
+            behaviour: PopupInteraction::Clickable,
+            opacity: 1.0,
+            close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+            close_condition: ObjectCloseCondition {
+                duration: None,
+                click: Some(CloseClickSettings::default()),
+            },
+            movement: Movement::Linear(Vec2::new(1., 0.0)),
+        });
+    });
+
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
 
@@ -49,7 +101,7 @@ fn main() {
                     list.shuffle(&mut rand::rng());
 
                     for entry in list {
-                        sender.send(ObjectMessage {
+                        _ = sender.send(ObjectMessage {
                             kind: ObjectType::Image(PopupImage {
                                 uri: entry.path().to_string_lossy().into_owned(),
                             }),
@@ -64,13 +116,14 @@ fn main() {
                                 duration: None,
                                 click: Some(CloseClickSettings::default()),
                             },
+                            movement: Movement::None,
                         });
                         std::thread::sleep(Duration::from_millis(1000));
                     }
                 });
             }
 
-            sender.send(ObjectMessage {
+            _ = sender.send(ObjectMessage {
                 kind: to_type(link.to_owned()),
                 position: PopupPosition::FullScreen {
                     screen: 1,
@@ -86,6 +139,7 @@ fn main() {
                     duration: None,
                     click: Some(CloseClickSettings::default()),
                 },
+                movement: Movement::None,
             });
         }
     }

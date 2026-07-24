@@ -2,10 +2,9 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use crate::animated_image::{
-    Gif3d, GifNode,
-    {Gif, GifAsset, GifDespawn, GifPlayer, messages::GifDespawnMessage},
-};
+use crate::{animated_image::{
+    Gif, Gif3d, GifAsset, GifDespawn, GifNode, GifPlayer, messages::GifDespawnMessage,
+}, lifecycle::Closing};
 
 #[derive(Component)]
 pub(crate) struct GifInitialized;
@@ -173,7 +172,7 @@ pub(crate) fn despawn_gifs(
                 panic!("Unexpected error: a GifPlayer was inserted in an unknown entity");
             };
             if gif_handle.id() == handle.id() {
-                commands.entity(entity).despawn();
+                commands.entity(entity).insert(Closing);
             }
         }
     }

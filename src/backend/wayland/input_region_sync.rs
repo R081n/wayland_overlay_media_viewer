@@ -3,8 +3,8 @@ use wayland_client::protocol::wl_surface::WlSurface;
 
 use crate::{
     backend::wayland::{
+        backend::{wayland_event_system, WaylandEventQueue},
         WaylandAppState,
-        backend::{WaylandEventQueue, wayland_event_system},
     },
     position::ScreenPosition,
 };
@@ -13,18 +13,21 @@ pub struct LayerShellInputPlugin;
 
 impl Plugin for LayerShellInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            PostUpdate,
-            update_layer_shell_input_regions.after(wayland_event_system),
-        );
+        app.insert_resource(RequestInputRecalc::default())
+            .add_systems(
+                PostUpdate,
+                update_layer_shell_input_regions.after(wayland_event_system),
+            );
     }
 }
 
-#[derive(Component, Debug, Clone, Default)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct RequestInputRecalc(bool);
 
 impl RequestInputRecalc {
+    #[track_caller]
     pub fn request(&mut self) {
+        println!("called from {}", std::panic::Location::caller());
         self.0 = true;
     }
 }
@@ -34,28 +37,26 @@ pub struct Clickable;
 
 fn update_layer_shell_input_regions(
     event_queue: NonSendMut<WaylandEventQueue>,
-    mut cameras: Query<(
-        &Camera,
-        &GlobalTransform,
-        &ScreenPosition,
-        &mut RequestInputRecalc,
-    )>,
+    mut cameras: Query<(&Camera, &GlobalTransform, &ScreenPosition)>,
     // Query all objects that should catch pointer/mouse inputs
     clickable_objects: Query<(&Aabb, &GlobalTransform), With<Clickable>>,
     app_state: NonSendMut<WaylandAppState>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
 ) -> Result<(), BevyError> {
-    if !app_state.is_running() {
+    if !app_state.is_running() || !input_recalc.0 {
         return Ok(());
     }
+
+    input_recalc.0 = false;
     // Iterate through every active camera output layer
-    for (camera, camera_transform, position, mut request) in &mut cameras {
+    for (camera, camera_transform, position) in &mut cameras {
         // Skip inactive or uninitialized cameras
         if !camera.is_active {
             //|| !request.0 {
             continue;
         }
 
-        request.0 = false;
+        dbg!("recals");
 
         let surface_info = app_state
             .surfaces
