@@ -95,10 +95,7 @@ fn main() {
 
                     for entry in list {
                         _ = sender.send(ObjectMessage {
-                            kind: ObjectType::Image(PopupImage {
-                                uri: entry.path().to_string_lossy().into_owned(),
-                            }),
-
+                            kind: to_type(entry.path().to_string_lossy().into_owned()),
                             position: PopupPosition::Random,
                             popup_animation: PopupInAnimation::SlideFadeIn,
                             behaviour: PopupInteraction::Clickable,

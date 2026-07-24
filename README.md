@@ -1,6 +1,6 @@
-#
+# Layershell based overlay media viewer
 
-Layershell based media viewer for wayland.
+This can be used to display your favorite media over other programs, with a variety of settings.
 
 ## Credits & References
 
