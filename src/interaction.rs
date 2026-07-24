@@ -1,19 +1,20 @@
 use bevy::{
     camera::{NormalizedRenderTarget, RenderTarget},
     picking::{
+        PickingSystems,
         backend::{
-            ray::{RayId, RayMap},
             HitData, PointerHits,
+            ray::{RayId, RayMap},
         },
         pointer::{PointerButton, PointerId, PointerLocation},
-        PickingSystems,
     },
     prelude::*,
 };
 
 use crate::{
+    Clickable,
     draw_order::DrawOrder,
-    lifecycle::{get_new_topmost_id, CloseOnClick, Closing},
+    lifecycle::{CloseOnClick, Closing, get_new_topmost_id},
     spawner::PopupLayer,
 };
 
@@ -167,6 +168,7 @@ fn on_right_dragging(
 
         if let Ok(ray) = camera.viewport_to_world(camera_transform, event.pointer_location.position)
         {
+            dbg!("hit");
             let camera_forward = camera_transform.forward();
             let denominator = ray.direction.dot(*camera_forward);
 
@@ -299,7 +301,7 @@ fn evaluate_hits_manually_fallback(
     ray_map: Res<RayMap>,
     mut ray_cast: MeshRayCast,
     mut hits_writer: MessageWriter<PointerHits>,
-    render_order: Query<&DrawOrder>,
+    render_order: Query<&DrawOrder, With<Clickable>>,
 ) {
     let mut max = i64::MIN;
     let mut closest = None;
@@ -313,19 +315,20 @@ fn evaluate_hits_manually_fallback(
 
             for (entity, hit) in hits {
                 // Map the hit data back into a format Bevy's interaction observers understand
-                let order = render_order.get(*entity).map(|d| d.0).unwrap_or_default();
-                if order > max {
-                    closest = Some((
-                        *entity,
-                        HitData {
-                            depth: hit.distance,
-                            position: Some(hit.point),
-                            normal: Some(hit.normal),
-                            camera: ray_id.camera,
-                            extra: None,
-                        },
-                    ));
-                    max = order;
+                if let Ok(order) = render_order.get(*entity).map(|d| d.0) {
+                    if order > max {
+                        closest = Some((
+                            *entity,
+                            HitData {
+                                depth: hit.distance,
+                                position: Some(hit.point),
+                                normal: Some(hit.normal),
+                                camera: ray_id.camera,
+                                extra: None,
+                            },
+                        ));
+                        max = order;
+                    }
                 }
             }
         }

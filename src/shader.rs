@@ -1,8 +1,5 @@
 use bevy::{
-    pbr::MaterialPlugin,
-    prelude::*,
-    reflect::TypePath,
-    render::render_resource::AsBindGroup,
+    pbr::MaterialPlugin, prelude::*, reflect::TypePath, render::render_resource::AsBindGroup,
 };
 
 pub struct DynamicShaderPlugin;

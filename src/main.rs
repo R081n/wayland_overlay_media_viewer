@@ -1,8 +1,9 @@
 use std::time::Duration;
 
+use bevy::math::{Vec2, VectorSpace};
 use rand::seq::SliceRandom;
 use wayland_overlay_media_viewer::{
-    position::PopupPosition,
+    position::{FullScreenMode, PopupPosition},
     spawner::{
         CloseClickSettings, CustomShaderSource, ObjectCloseCondition, ObjectMessage, ObjectType,
         PopupImage, PopupInAnimation, PopupInteraction, PopupLayer, PopupOutAnimation, PopupVideo,
@@ -17,9 +18,10 @@ fn main() {
             code: MY_WGSL_STRING.to_owned(),
             duraton: 10.0,
         }),
-        position: PopupPosition::FullScreeAll {
+        position: PopupPosition::FullScreen {
             screen: 1,
             relative_center: bevy::math::Vec2::ZERO,
+            mode: FullScreenMode::All,
         },
         layer: PopupLayer::Above,
         popup_animation: PopupInAnimation::None,
@@ -70,7 +72,11 @@ fn main() {
 
             sender.send(ObjectMessage {
                 kind: to_type(link.to_owned()),
-                position: PopupPosition::Random,
+                position: PopupPosition::FullScreen {
+                    screen: 1,
+                    relative_center: Vec2::ZERO,
+                    mode: FullScreenMode::One,
+                },
                 popup_animation: PopupInAnimation::SlideFadeIn,
                 behaviour: PopupInteraction::Clickable,
                 opacity: 0.9,

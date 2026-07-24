@@ -18,8 +18,9 @@ use std::time::Duration;
 
 pub use backend::*;
 use bevy::{
+    DefaultPlugins,
     app::{App, PluginGroup as _, PreUpdate, Startup, TerminalCtrlCHandlerPlugin, Update},
-    asset::{io::web::WebAssetPlugin, AssetPlugin},
+    asset::{AssetPlugin, io::web::WebAssetPlugin},
     camera::ClearColor,
     color::Color,
     dev_tools::picking_debug::DebugPickingMode,
@@ -34,7 +35,6 @@ use bevy::{
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::WindowPlugin,
     winit::WinitPlugin,
-    DefaultPlugins,
 };
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
@@ -47,7 +47,7 @@ use crate::{
     lifecycle::LiveCyclePlugin,
     position::ScreenPosition,
     shader::DynamicShaderPlugin,
-    spawner::{preload_asset, ObjectMessage, PopupPlugin},
+    spawner::{ObjectMessage, PopupPlugin, preload_asset},
     texts::TextOverlayPlugin,
     videos::plugin::VideoPlugin,
 };
@@ -82,6 +82,7 @@ fn startup_inner(rx: DataReceiver) {
     app.insert_resource(rx);
 
     app.add_systems(Update, videos::plugin::render_video_frame);
+    app.add_observer(videos::plugin::on_video_removed);
 
     let window_plugin = WindowPlugin {
         primary_window: None,

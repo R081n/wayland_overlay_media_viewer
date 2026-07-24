@@ -1,8 +1,8 @@
 pub mod backend;
 pub mod input_region_sync;
+mod premultiply;
 pub mod render;
 pub mod surface;
-mod premultiply;
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};

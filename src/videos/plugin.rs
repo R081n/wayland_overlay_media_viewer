@@ -239,3 +239,16 @@ pub fn insert_video_component(
         image_handle,
     )
 }
+
+pub fn on_video_removed(
+    removed: On<Remove, VideoPlayer>,
+    mut query: Query<&mut VideoPlayer>,
+) -> Result<(), BevyError> {
+    let mut player = query.get_mut(removed.entity)?;
+    player.state = VideoState::Stop;
+    if let Some(pipeline) = &player.pipeline {
+        pipeline.destroy();
+    };
+
+    Ok(())
+}

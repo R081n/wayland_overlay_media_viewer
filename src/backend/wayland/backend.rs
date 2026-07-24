@@ -1,13 +1,11 @@
-use std::io::ErrorKind;
 use std::collections::HashSet;
+use std::io::ErrorKind;
 
 use bevy::camera::visibility::NoFrustumCulling;
 use bevy::light::cluster::ClusterConfig;
 use bevy::math::{I64Vec2, U64Vec2};
 use bevy::picking::PickingSystems;
-use bevy::picking::pointer::{
-    Location, PointerAction, PointerInput,
-};
+use bevy::picking::pointer::{Location, PointerAction, PointerInput};
 use bevy::render::view::NoIndirectDrawing;
 use bevy::{
     camera::{ImageRenderTarget, RenderTarget},
@@ -87,7 +85,7 @@ impl Plugin for WaylandBackendPlugin {
             .add_systems(First, pointer_input_system.in_set(PickingSystems::Input))
             .insert_non_send(WaylandEventQueue(event_queue))
             .insert_non_send(app_state)
-            .add_plugins((LayerShellInputPlugin,WaylandPresentPlugin));
+            .add_plugins((LayerShellInputPlugin, WaylandPresentPlugin));
     }
 }
 

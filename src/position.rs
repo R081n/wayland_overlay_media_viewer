@@ -3,12 +3,24 @@ use bevy::{
     math::{I64Vec2, Rect, U64Vec2, Vec2, Vec3},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum PopupPosition {
     Global(Vec3),
     SceenSpace(u32 /*or some id */, Vec2),
-    FullScreeAll { screen: u32, relative_center: Vec2 },
+    FullScreen {
+        screen: u32,
+        // Relative to the center
+        // screen is normalized to [-1, 1],
+        relative_center: Vec2,
+        mode: FullScreenMode,
+    },
     Random,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FullScreenMode {
+    One,
+    All,
 }
 
 pub const PIXELS_PER_METER: f32 = 100.0;

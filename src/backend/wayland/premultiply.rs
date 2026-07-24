@@ -1,9 +1,9 @@
 use bevy::{
     prelude::*,
     render::{
+        Render, RenderApp,
         render_resource::*,
         renderer::{RenderDevice, RenderQueue},
-        Render, RenderApp,
     },
 };
 

@@ -11,10 +11,10 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    draw_order::DrawOrder,
-    position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
-    spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, TargetOpacity},
     Clickable,
+    draw_order::DrawOrder,
+    position::{FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition},
+    spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, TargetOpacity},
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);
@@ -59,15 +59,16 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         PopupPosition::Random => {
             commands.trigger(PlaceAtRandomPosition);
         }
-        PopupPosition::FullScreeAll {
+        PopupPosition::FullScreen {
             screen,
             relative_center,
+            mode,
         } => {
             commands.trigger(|entity| PlaceAtScreenPos {
                 entity,
                 screen,
                 relative_center,
-                mode: FullScreenMode::All,
+                mode,
             });
         }
     }
@@ -315,12 +316,6 @@ struct PlaceAtScreenPos {
     mode: FullScreenMode,
 }
 
-enum FullScreenMode {
-    #[allow(dead_code)]
-    One,
-    All,
-}
-
 fn place_at_sceen_pos(
     trigger: On<PlaceAtScreenPos>,
     mut objects: Query<&mut Transform>,
@@ -335,16 +330,24 @@ fn place_at_sceen_pos(
     let mut object = objects.get_mut(trigger.entity)?;
 
     let scale = match trigger.mode {
-        FullScreenMode::One => todo!(),
+        FullScreenMode::One => scale_to_fit(object.scale.xy(), screen.rect.size()),
         FullScreenMode::All => object.scale.normalize().xy() * 1000.0,
     };
 
-    let center = screen.rect.center() + trigger.relative_center * screen.rect.size();
+    let center = screen.rect.center() + trigger.relative_center * screen.rect.size() * 0.5;
 
-    object.translation = center.extend(0.0);
-    object.scale = scale.extend(0.0);
+    object.translation = center.extend(-1.0);
+    object.scale = scale.extend(1.0);
 
     Ok(())
+}
+
+fn scale_to_fit(source: Vec2, target: Vec2) -> Vec2 {
+    let scale_factors = target / source;
+
+    let max_scale = scale_factors.min_element();
+
+    source * max_scale
 }
 
 fn make_visible_on_the_second_frame(
