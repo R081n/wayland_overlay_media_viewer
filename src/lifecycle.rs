@@ -225,7 +225,7 @@ fn on_close_in(trigger: On<CloseInDuration>, mut commands: Commands) {
 }
 
 #[derive(Component, Default)]
-struct Closing {
+pub struct Closing {
     kind: PopupOutAnimation,
 }
 

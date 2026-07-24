@@ -11,6 +11,8 @@ use bevy::{
     prelude::*,
 };
 
+use crate::{draw_order::DrawOrder, lifecycle::Closing};
+
 pub struct PopupInteractionPlugin;
 
 impl Plugin for PopupInteractionPlugin {
@@ -33,6 +35,7 @@ impl Plugin for PopupInteractionPlugin {
 
         app
             // We register standard global observers for clean event propagation
+            .add_observer(on_left_click)
             .add_observer(on_right_drag_start)
             .add_observer(on_right_dragging)
             .add_observer(on_right_drag_end);
@@ -43,42 +46,60 @@ impl Plugin for PopupInteractionPlugin {
 
 /// Tracks state parameters while an item is actively manipulated by a specific pointer.
 #[derive(Component)]
-#[component(storage = "SparseSet")] // Highly performant optimization for frequent add/remove cycles
-struct RightDragging {
+#[component(storage = "SparseSet")]
+pub struct RightDragging {
     pub pointer_id: PointerId,
     pub camera_entity: Entity,
+    // 💡 THE FIX: Store the spatial offset between the object's center and the mouse hit point
+    pub initial_offset: Vec3,
 }
+// --- Observers (Bevy 0.19 Native Interaction Architecture) ---
 
 // --- Observers (Bevy 0.19 Native Interaction Architecture) ---
 
-/// Listens globally for drag actions to filter for Right Mouse clicks.
-fn on_right_drag_start(trigger: On<Pointer<DragStart>>, mut commands: Commands) {
+/// Listens globally for drag actions to filter for Right Mouse clicks and stores the initial offset.
+fn on_right_drag_start(
+    trigger: On<Pointer<DragStart>>,
+    mut commands: Commands,
+    query: Query<&Transform>,
+) {
     let event = trigger.event();
 
-    // Explicitly enforce isolation so Left Click dragging can handle selection/other logic
     if event.button == PointerButton::Secondary {
+        // Fetch the object's starting translation to calculate the delta
+        let object_center = query
+            .get(trigger.entity)
+            .map(|t| t.translation)
+            .unwrap_or(Vec3::ZERO);
+
+        // Fetch where the cursor ray physically intersected the mesh surface.
+        // Fallback to the object's center if the hit position is somehow undefined.
+        let hit_point = event.hit.position.unwrap_or(object_center);
+
+        // Calculate the relative vector offset
+        let initial_offset = object_center - hit_point;
+
         commands.entity(trigger.entity).insert(RightDragging {
             pointer_id: event.pointer_id,
             camera_entity: event.hit.camera,
+            initial_offset, // 👈 Saved for continuous tracking
         });
     }
 }
 
-/// Listens globally for continuous cursor tracking movements.
+/// Listens globally for continuous cursor tracking movements, preserving the original hit offset.
 fn on_right_dragging(
     trigger: On<Pointer<Drag>>,
+    // TODO render order,
     mut dragged_entities: Query<(&mut Transform, &RightDragging)>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
 ) {
     let event = trigger.event();
 
-    // Extract targets matching the currently observed entity
-
     let Ok((mut transform, dragging)) = dragged_entities.get_mut(trigger.entity) else {
         return;
     };
 
-    // Safety checks: ensure the exact pointer matching the initialization layout controls it
     if event.pointer_id != dragging.pointer_id {
         return;
     }
@@ -87,23 +108,21 @@ fn on_right_dragging(
         return;
     };
 
-    dbg!("teststTt");
-
-    // Project screen pixels directly through the correct camera matrix
-    let current_world_pos = transform.translation;
+    // Use the stored offset to locate the virtual plane depth where the drag loop was initiated
+    let original_object_center = transform.translation;
+    let original_hit_point = original_object_center - dragging.initial_offset;
 
     if let Ok(ray) = camera.viewport_to_world(camera_transform, event.pointer_location.position) {
-        // Construct a movement surface parallel to the camera view plane at the mesh depth
         let camera_forward = camera_transform.forward();
         let denominator = ray.direction.dot(*camera_forward);
 
         if denominator.abs() > f32::EPSILON {
-            // Find out exactly where the ray crosses the object's parallel plane depth
-            let distance = (current_world_pos - ray.origin).dot(*camera_forward) / denominator;
-            let target_world_pos = ray.origin + ray.direction * distance;
+            // Find where the ray intersects the virtual flat plane passing through our original hit point
+            let distance = (original_hit_point - ray.origin).dot(*camera_forward) / denominator;
+            let current_ray_intersection = ray.origin + ray.direction * distance;
 
-            // Re-assign translations instantly
-            transform.translation = target_world_pos;
+            // 💡 APPLY THE OFFSET: Reconstruct the new object center relative to where the cursor is now
+            transform.translation = current_ray_intersection + dragging.initial_offset;
         }
     }
 }
@@ -123,9 +142,19 @@ fn on_right_drag_end(
     }
 }
 
+fn on_left_click(trigger: On<Pointer<Click>>, mut commands: Commands) {
+    let event = trigger.event();
+
+    if event.button != PointerButton::Primary {
+        return;
+    }
+
+    commands.entity(event.entity).insert(Closing::default());
+}
+
 fn populate_ray_map_manually(
     pointer_query: Query<(Entity, &PointerLocation)>,
-    camera_query: Query<(&Camera, &GlobalTransform, &RenderTarget)>,
+    camera_query: Query<(Entity, &Camera, &GlobalTransform, &RenderTarget)>,
     // Fetch the mutable RayMap framework resource
     mut ray_map: ResMut<RayMap>,
 ) {
@@ -140,7 +169,7 @@ fn populate_ray_map_manually(
             continue;
         };
 
-        for (camera, camera_transform, target) in &camera_query {
+        for (cam_entity, camera, camera_transform, target) in &camera_query {
             let RenderTarget::Image(target) = target else {
                 continue;
             };
@@ -152,7 +181,7 @@ fn populate_ray_map_manually(
             // Project the 2D cursor into a valid 3D Ray3d space through the camera matrix
             if let Ok(ray) = camera.viewport_to_world(camera_transform, location.position) {
                 // Construct a unique identifier pairing this specific cursor entity to this camera viewport
-                let ray_id = RayId::new(pointer_entity, PointerId::Mouse);
+                let ray_id = RayId::new(cam_entity, PointerId::Mouse);
 
                 // Insert the generated ray directly into Bevy's core mesh targeting map
                 ray_map.map.insert(ray_id, ray);
@@ -168,9 +197,12 @@ fn evaluate_hits_manually_fallback(
     // 💡 High-utility structural parameter that executes geometric ray intersects directly
     mut ray_cast: MeshRayCast,
     mut hits: MessageWriter<PointerHits>,
+    render_order: Query<&DrawOrder>,
 ) {
     // Keep track of our hits for this frame loop
     let mut fresh_hits = Vec::new();
+
+    let max = render_order.iter().map(|d| d.0).max().unwrap_or_default();
 
     // Iterate through all custom rays currently registered in the map
     for (ray_id, ray) in ray_map.iter() {
@@ -180,10 +212,12 @@ fn evaluate_hits_manually_fallback(
 
             for (entity, hit) in hits {
                 // Map the hit data back into a format Bevy's interaction observers understand
+                let order = render_order.get(*entity).map(|d| d.0).unwrap_or_default();
+
                 fresh_hits.push((
                     *entity,
                     HitData {
-                        depth: hit.distance,
+                        depth: hit.distance + (max - order) as f32,
                         position: Some(hit.point),
                         normal: Some(hit.normal),
                         camera: ray_id.camera,

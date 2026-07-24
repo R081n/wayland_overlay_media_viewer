@@ -29,7 +29,7 @@ fn main() {
 
                         position: PopupPosition::Random,
                         popup_animation: PopupInAnimation::SlideFadeIn,
-                        behaviour: PopupInteraction::ClickThough,
+                        behaviour: PopupInteraction::Clickable,
                         opacity: 0.9,
                         close_animation: PopupOutAnimation::FadeOut,
                         close_condition: ObjectCloseCondition {

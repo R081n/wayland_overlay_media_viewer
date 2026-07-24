@@ -8,7 +8,6 @@ mod draw_order;
 pub mod images;
 pub mod interaction;
 pub mod lifecycle;
-pub mod pointer_visualization_plugin;
 pub mod position;
 pub mod spawner;
 pub mod videos;
@@ -117,7 +116,6 @@ fn startup_inner(rx: DataReceiver) {
         AnimatedImagePlugin,
         CustomDrawOrderPlugin,
         PopupInteractionPlugin,
-        PointerVisualizerPlugin,
         MeshPickingPlugin,
         EntropyPlugin::<WyRand>::default(),
     ));
@@ -130,7 +128,7 @@ fn startup_inner(rx: DataReceiver) {
         multi_click_interval: Duration::from_millis(500),
     });
     app.insert_resource(MeshPickingSettings {
-        require_markers: false,
+        require_markers: true,
         ray_cast_visibility: RayCastVisibility::Any,
     });
 
