@@ -17,8 +17,7 @@ use bevy::{
 };
 use wgpu::{
     BindGroupEntry, BindingResource, CommandEncoderDescriptor, CompositeAlphaMode,
-    CurrentSurfaceTexture, Origin3d, PresentMode, SurfaceConfiguration, SurfaceTargetUnsafe,
-    TextureAspect,
+    CurrentSurfaceTexture, PresentMode, SurfaceConfiguration, SurfaceTargetUnsafe,
 };
 
 use super::surface::WaylandSurfaceHandles;
@@ -284,7 +283,7 @@ pub(crate) fn present_wayland_surface(
             return;
         };
 
-        let extent = Extent3d {
+        let _extent = Extent3d {
             width: config.width.min(gpu_image.texture_descriptor.size.width),
             height: config.height.min(gpu_image.texture_descriptor.size.height),
             depth_or_array_layers: 1,

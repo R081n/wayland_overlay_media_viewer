@@ -11,10 +11,10 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    draw_order::DrawOrder,
-    position::{FullScreenMode, PopupPosition, ScreenPosition, PIXELS_PER_METER},
-    spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, TargetOpacity},
     Clickable,
+    draw_order::DrawOrder,
+    position::{FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition},
+    spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, TargetOpacity},
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);

@@ -5,8 +5,8 @@ use rand::seq::SliceRandom;
 use wayland_overlay_media_viewer::{
     position::{FullScreenMode, PopupPosition},
     spawner::{
-        CloseClickSettings, CustomShaderSource, ObjectCloseCondition, ObjectMessage, ObjectType,
-        PopupImage, PopupInAnimation, PopupInteraction, PopupLayer, PopupOutAnimation, PopupVideo,
+        CloseClickSettings, ObjectCloseCondition, ObjectMessage, ObjectType, PopupImage,
+        PopupInAnimation, PopupInteraction, PopupLayer, PopupOutAnimation, PopupVideo,
     },
 };
 
@@ -42,7 +42,7 @@ fn main() {
             .map(|p| p.trim())
             .filter(|p| !p.is_empty())
         {
-            if let Ok(dir) = std::fs::read_dir(&link) {
+            if let Ok(dir) = std::fs::read_dir(link) {
                 let sender = sender.clone();
                 std::thread::spawn(move || {
                     let mut list: Vec<_> = dir.flatten().collect();

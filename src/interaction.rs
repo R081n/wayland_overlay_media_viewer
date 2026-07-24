@@ -1,21 +1,21 @@
 use bevy::{
     camera::{NormalizedRenderTarget, RenderTarget},
     picking::{
+        PickingSystems,
         backend::{
-            ray::{RayId, RayMap},
             HitData, PointerHits,
+            ray::{RayId, RayMap},
         },
         pointer::{PointerButton, PointerId, PointerLocation},
-        PickingSystems,
     },
     prelude::*,
 };
 
 use crate::{
-    draw_order::DrawOrder,
-    lifecycle::{get_new_topmost_id, CloseOnClick, Closing},
-    spawner::PopupLayer,
     Clickable,
+    draw_order::DrawOrder,
+    lifecycle::{CloseOnClick, Closing, get_new_topmost_id},
+    spawner::PopupLayer,
 };
 
 pub struct PopupInteractionPlugin;
@@ -253,7 +253,7 @@ fn on_left_click(
         return;
     }
 
-    commands.entity(event.entity).insert(Closing::default());
+    commands.entity(event.entity).insert(Closing);
 }
 
 fn populate_ray_map_manually(
@@ -314,20 +314,20 @@ fn evaluate_hits_manually_fallback(
 
             for (entity, hit) in hits {
                 // Map the hit data back into a format Bevy's interaction observers understand
-                if let Ok(order) = render_order.get(*entity).map(|d| d.0) {
-                    if order > max {
-                        closest = Some((
-                            *entity,
-                            HitData {
-                                depth: hit.distance,
-                                position: Some(hit.point),
-                                normal: Some(hit.normal),
-                                camera: ray_id.camera,
-                                extra: None,
-                            },
-                        ));
-                        max = order;
-                    }
+                if let Ok(order) = render_order.get(*entity).map(|d| d.0)
+                    && order > max
+                {
+                    closest = Some((
+                        *entity,
+                        HitData {
+                            depth: hit.distance,
+                            position: Some(hit.point),
+                            normal: Some(hit.normal),
+                            camera: ray_id.camera,
+                            extra: None,
+                        },
+                    ));
+                    max = order;
                 }
             }
         }

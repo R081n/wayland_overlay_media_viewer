@@ -228,7 +228,7 @@ pub fn render_video_frame(
                     pipeline.destroy();
                 }
                 if !is_closing {
-                    commands.entity(id).insert(Closing::default());
+                    commands.entity(id).insert(Closing);
                 }
             }
             _ => {}

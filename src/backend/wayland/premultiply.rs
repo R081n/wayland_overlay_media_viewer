@@ -1,10 +1,6 @@
 use bevy::{
     prelude::*,
-    render::{
-        Render, RenderApp,
-        render_resource::*,
-        renderer::{RenderDevice, RenderQueue},
-    },
+    render::{RenderApp, render_resource::*, renderer::RenderDevice},
 };
 
 /// Resource stored in the Render App world containing the persistent pipeline data
