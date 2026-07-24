@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use crate::videos::videos::FfmpegPlayer;
+use crate::{lifecycle::Closing, videos::videos::FfmpegPlayer};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VideoState {
@@ -17,6 +17,7 @@ pub enum VideoState {
     Start,
     Ready,
     Loading,
+    Finished,
     #[allow(dead_code)]
     Stop,
 }
@@ -82,44 +83,51 @@ fn handle_playing_state(
     if let Ok(mut player_time) = video_player.timer.lock()
         && player_time.tick(time.delta()).just_finished()
         && let Some(ref_pipeline) = video_player.pipeline.as_ref()
-        && let Ok(mut frames) = ref_pipeline.frame.lock()
-        && let Some(data) = frames.pop_front()
     {
-        // Update current position based on the frame being rendered
-        if let Ok(mut pos) = ref_pipeline.current_position.lock() {
-            *pos = data.position_secs;
-        }
+        if let Ok(mut frames) = ref_pipeline.frame.lock()
+            && let Some(data) = frames.pop_front()
+        {
+            // Update current position based on the frame being rendered
+            if let Ok(mut pos) = ref_pipeline.current_position.lock() {
+                *pos = data.position_secs;
+            }
 
-        if let Some(rbg_data) = image::RgbaImage::from_raw(data.width, data.height, data.data) {
-            let canvas: Image = Image::from_dynamic(
-                DynamicImage::ImageRgba8(rbg_data),
-                false,
-                RenderAssetUsages::default(),
-            );
+            if let Some(rbg_data) = image::RgbaImage::from_raw(data.width, data.height, data.data) {
+                let canvas: Image = Image::from_dynamic(
+                    DynamicImage::ImageRgba8(rbg_data),
+                    false,
+                    RenderAssetUsages::default(),
+                );
 
-            // must touch this to trigger update
-            let mut mat = materials.get_mut(material.id()).unwrap();
-            _ = mat.deref_mut();
-            video_player.played_frames += 1;
+                // must touch this to trigger update
+                let mut mat = materials.get_mut(material.id()).unwrap();
+                _ = mat.deref_mut();
+                video_player.played_frames += 1;
 
-            let mut old = images.get_mut(image_handle.handle.id()).unwrap();
-            *old = canvas;
-            if let Ok(mut pts) = ref_pipeline.previous_pts.lock() {
-                // Handle first frame: initialize previous_pts
-                if *pts == 0 {
-                    *pts = data.pts;
-                    player_time.set_duration(Duration::from_millis(33));
-                // ~30fps default
-                } else if data.pts > *pts {
-                    let dt = (data.pts - *pts) / 1_000_000;
-                    // Clamp dt to reasonable range (1ms - 100ms)
-                    let dt = dt.clamp(1, 100);
-                    player_time.set_duration(Duration::from_millis(dt));
-                    *pts = data.pts;
-                } else {
-                    *pts = data.pts;
+                let mut old = images.get_mut(image_handle.handle.id()).unwrap();
+                *old = canvas;
+                if let Ok(mut pts) = ref_pipeline.previous_pts.lock() {
+                    // Handle first frame: initialize previous_pts
+                    if *pts == 0 {
+                        *pts = data.pts;
+                        player_time.set_duration(Duration::from_millis(33));
+                    // ~30fps default
+                    } else if data.pts > *pts {
+                        let dt = (data.pts - *pts) / 1_000_000;
+                        // Clamp dt to reasonable range (1ms - 100ms)
+                        let dt = dt.clamp(1, 100);
+                        player_time.set_duration(Duration::from_millis(dt));
+                        *pts = data.pts;
+                    } else {
+                        *pts = data.pts;
+                    }
                 }
             }
+        } else if ref_pipeline
+            .finished
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            video_player.state = VideoState::Finished;
         }
     }
 }
@@ -136,16 +144,19 @@ fn initialize_video_player(video_player: &mut VideoPlayer) {
 }
 
 pub fn render_video_frame(
+    mut commands: Commands,
     mut query: Query<(
+        Entity,
         &mut VideoPlayer,
         &mut VideoTarget,
         &MeshMaterial3d<StandardMaterial>,
+        Has<Closing>,
     )>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
     time: Res<Time>,
 ) {
-    for (mut video_player, mut image_handle, material) in query.iter_mut() {
+    for (id, mut video_player, mut image_handle, material, is_closing) in query.iter_mut() {
         match video_player.state {
             VideoState::Playing => handle_playing_state(
                 &mut video_player,
@@ -210,6 +221,14 @@ pub fn render_video_frame(
             VideoState::Stop => {
                 if let Some(ref pipeline) = video_player.pipeline {
                     pipeline.destroy();
+                }
+            }
+            VideoState::Finished => {
+                if let Some(ref pipeline) = video_player.pipeline {
+                    pipeline.destroy();
+                }
+                if !is_closing {
+                    commands.entity(id).insert(Closing::default());
                 }
             }
             _ => {}

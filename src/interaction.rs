@@ -1,21 +1,21 @@
 use bevy::{
     camera::{NormalizedRenderTarget, RenderTarget},
     picking::{
-        PickingSystems,
         backend::{
-            HitData, PointerHits,
             ray::{RayId, RayMap},
+            HitData, PointerHits,
         },
         pointer::{PointerButton, PointerId, PointerLocation},
+        PickingSystems,
     },
     prelude::*,
 };
 
 use crate::{
-    Clickable,
     draw_order::DrawOrder,
-    lifecycle::{CloseOnClick, Closing, get_new_topmost_id},
+    lifecycle::{get_new_topmost_id, CloseOnClick, Closing},
     spawner::PopupLayer,
+    Clickable,
 };
 
 pub struct PopupInteractionPlugin;
@@ -168,7 +168,6 @@ fn on_right_dragging(
 
         if let Ok(ray) = camera.viewport_to_world(camera_transform, event.pointer_location.position)
         {
-            dbg!("hit");
             let camera_forward = camera_transform.forward();
             let denominator = ray.direction.dot(*camera_forward);
 

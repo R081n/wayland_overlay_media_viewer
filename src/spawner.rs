@@ -67,7 +67,7 @@ pub enum PopupInAnimation {
     SlideFadeIn,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Component)]
 pub enum PopupOutAnimation {
     #[default]
     None,

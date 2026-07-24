@@ -3,7 +3,6 @@
 
 pub mod animated_image;
 mod backend;
-pub mod cleanup;
 mod draw_order;
 pub mod images;
 pub mod interaction;
@@ -92,7 +91,7 @@ fn startup_inner(rx: DataReceiver) {
 
     app.add_plugins((
         DefaultPlugins
-            .set(ImagePlugin::default_nearest())
+            .set(ImagePlugin::default_linear())
             .set(WebAssetPlugin {
                 silence_startup_warning: true,
             })

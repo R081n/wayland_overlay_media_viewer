@@ -11,10 +11,10 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    Clickable,
     draw_order::DrawOrder,
-    position::{FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition},
+    position::{FullScreenMode, PopupPosition, ScreenPosition, PIXELS_PER_METER},
     spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, TargetOpacity},
+    Clickable,
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);
@@ -46,6 +46,7 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         Visibility::Hidden,
         SetPopupVisibleNextFrame,
         msg.layer,
+        msg.close_animation,
     ));
 
     match msg.position {
@@ -82,11 +83,7 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
 
     let close = &msg.close_condition;
     if let Some(duration) = close.duration {
-        commands.trigger(|entity| CloseInDuration {
-            entity,
-            duration,
-            kind: msg.close_animation,
-        });
+        commands.trigger(|entity| CloseInDuration { entity, duration });
     }
 
     if close.click.is_some() {
@@ -267,7 +264,6 @@ pub struct CloseOnClick;
 struct CloseInDuration {
     entity: Entity,
     duration: Duration,
-    kind: PopupOutAnimation,
 }
 
 fn on_close_in(trigger: On<CloseInDuration>, mut commands: Commands) {
@@ -275,22 +271,27 @@ fn on_close_in(trigger: On<CloseInDuration>, mut commands: Commands) {
         .delayed()
         .duration(trigger.duration)
         .entity(trigger.entity)
-        .try_insert(Closing { kind: trigger.kind });
+        .try_insert(Closing);
 }
 
 #[derive(Component, Default)]
-pub struct Closing {
-    kind: PopupOutAnimation,
-}
+pub struct Closing;
 
 fn handle_closing(
     mut commands: Commands,
     time: Res<Time>,
-    mut closing: Query<(Entity, &Closing, &mut MeshMaterial3d<StandardMaterial>)>,
+    mut closing: Query<
+        (
+            Entity,
+            &mut MeshMaterial3d<StandardMaterial>,
+            &PopupOutAnimation,
+        ),
+        With<Closing>,
+    >,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    for (id, closing, handle) in closing.iter_mut() {
-        match closing.kind {
+    for (id, handle, animation) in closing.iter_mut() {
+        match *animation {
             PopupOutAnimation::None => commands.entity(id).despawn(),
             PopupOutAnimation::FadeOut { decay_rate } => {
                 let delta = time.delta_secs();

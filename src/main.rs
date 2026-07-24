@@ -13,26 +13,26 @@ use wayland_overlay_media_viewer::{
 fn main() {
     let sender = wayland_overlay_media_viewer::startup();
 
-    sender.send(ObjectMessage {
-        kind: ObjectType::Shader(CustomShaderSource {
-            code: MY_WGSL_STRING.to_owned(),
-            duraton: 10.0,
-        }),
-        position: PopupPosition::FullScreen {
-            screen: 1,
-            relative_center: bevy::math::Vec2::ZERO,
-            mode: FullScreenMode::All,
-        },
-        layer: PopupLayer::Above,
-        popup_animation: PopupInAnimation::None,
-        behaviour: PopupInteraction::ClickThough,
-        opacity: 0.1,
-        close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
-        close_condition: ObjectCloseCondition {
-            duration: None,
-            click: None,
-        },
-    });
+    // sender.send(ObjectMessage {
+    //     kind: ObjectType::Shader(CustomShaderSource {
+    //         code: MY_WGSL_STRING.to_owned(),
+    //         duraton: 10.0,
+    //     }),
+    //     position: PopupPosition::FullScreen {
+    //         screen: 1,
+    //         relative_center: bevy::math::Vec2::ZERO,
+    //         mode: FullScreenMode::All,
+    //     },
+    //     layer: PopupLayer::Above,
+    //     popup_animation: PopupInAnimation::None,
+    //     behaviour: PopupInteraction::ClickThough,
+    //     opacity: 0.01,
+    //     close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+    //     close_condition: ObjectCloseCondition {
+    //         duration: None,
+    //         click: None,
+    //     },
+    // });
 
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
@@ -59,7 +59,7 @@ fn main() {
                             behaviour: PopupInteraction::Clickable,
                             opacity: 0.9,
                             layer: PopupLayer::Normal,
-                            close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+                            close_animation: PopupOutAnimation::FadeOut { decay_rate: 5.0 },
                             close_condition: ObjectCloseCondition {
                                 duration: None,
                                 click: Some(CloseClickSettings::default()),
@@ -81,7 +81,7 @@ fn main() {
                 behaviour: PopupInteraction::Clickable,
                 opacity: 0.9,
                 layer: PopupLayer::Normal,
-                close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+                close_animation: PopupOutAnimation::FadeOut { decay_rate: 5.0 },
                 close_condition: ObjectCloseCondition {
                     duration: None,
                     click: Some(CloseClickSettings::default()),
