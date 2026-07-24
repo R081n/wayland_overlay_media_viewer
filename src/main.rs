@@ -5,7 +5,7 @@ use wayland_overlay_media_viewer::{
     position::PopupPosition,
     spawner::{
         CloseClickSettings, CustomShaderSource, ObjectCloseCondition, ObjectMessage, ObjectType,
-        PopupImage, PopupInAnimation, PopupInteraction, PopupOutAnimation, PopupVideo,
+        PopupImage, PopupInAnimation, PopupInteraction, PopupLayer, PopupOutAnimation, PopupVideo,
     },
 };
 
@@ -21,6 +21,7 @@ fn main() {
             screen: 1,
             relative_center: bevy::math::Vec2::ZERO,
         },
+        layer: PopupLayer::Above,
         popup_animation: PopupInAnimation::None,
         behaviour: PopupInteraction::ClickThough,
         opacity: 0.1,
@@ -55,6 +56,7 @@ fn main() {
                             popup_animation: PopupInAnimation::SlideFadeIn,
                             behaviour: PopupInteraction::Clickable,
                             opacity: 0.9,
+                            layer: PopupLayer::Normal,
                             close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
                             close_condition: ObjectCloseCondition {
                                 duration: None,
@@ -72,6 +74,7 @@ fn main() {
                 popup_animation: PopupInAnimation::SlideFadeIn,
                 behaviour: PopupInteraction::Clickable,
                 opacity: 0.9,
+                layer: PopupLayer::Normal,
                 close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
                 close_condition: ObjectCloseCondition {
                     duration: None,

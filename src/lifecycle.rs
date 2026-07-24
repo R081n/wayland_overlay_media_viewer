@@ -1,5 +1,5 @@
 use std::{
-    ops::{Add, Div},
+    ops::{Add as _, Div},
     sync::atomic::AtomicI64,
     time::Duration,
 };
@@ -13,22 +13,39 @@ use rand::RngExt;
 use crate::{
     draw_order::DrawOrder,
     position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
-    spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
+    spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, TargetOpacity},
     Clickable,
 };
-static NEXT_ID: AtomicI64 = AtomicI64::new(0);
+static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
+static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);
+static NEXT_ID_ABOVE: AtomicI64 = AtomicI64::new(i64::MAX / 2);
 
-pub fn get_new_topmost_id() -> DrawOrder {
-    DrawOrder(NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+pub fn get_new_topmost_id(layer: PopupLayer) -> DrawOrder {
+    match layer {
+        PopupLayer::Below => {
+            DrawOrder(NEXT_ID_BELOW.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+        }
+        PopupLayer::Normal => {
+            DrawOrder(NEXT_ID_NORMAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+        }
+        PopupLayer::Above => {
+            DrawOrder(NEXT_ID_ABOVE.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+        }
+    }
 }
 
+#[derive(Component)]
+struct SetPopupVisibleNextFrame;
+
 pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage) {
-    // Bevy Settngs
     commands.insert((
         // Almost no shared materials
         NoAutomaticBatching,
         // No Shadows
         NotShadowCaster,
+        Visibility::Hidden,
+        SetPopupVisibleNextFrame,
+        msg.layer,
     ));
 
     match msg.position {
@@ -94,7 +111,7 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         }
     }
 
-    commands.insert((TargetOpacity(msg.opacity), get_new_topmost_id()));
+    commands.insert((TargetOpacity(msg.opacity), get_new_topmost_id(msg.layer)));
 }
 
 pub struct LiveCyclePlugin;
@@ -102,6 +119,7 @@ pub struct LiveCyclePlugin;
 impl Plugin for LiveCyclePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (handle_slide_fade_in, handle_closing).chain())
+            .add_systems(First, make_visible_on_the_second_frame)
             .add_observer(handle_random_position)
             .add_observer(place_at_sceen_pos)
             .add_observer(on_close_in);
@@ -327,4 +345,15 @@ fn place_at_sceen_pos(
     object.scale = scale.extend(0.0);
 
     Ok(())
+}
+
+fn make_visible_on_the_second_frame(
+    mut commands: Commands,
+    mut visibility: Query<(Entity, &mut Visibility), With<SetPopupVisibleNextFrame>>,
+) {
+    for (id, mut vis) in &mut visibility {
+        *vis = Visibility::Visible;
+
+        commands.entity(id).remove::<SetPopupVisibleNextFrame>();
+    }
 }

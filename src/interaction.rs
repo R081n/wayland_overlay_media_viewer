@@ -14,6 +14,7 @@ use bevy::{
 use crate::{
     draw_order::DrawOrder,
     lifecycle::{get_new_topmost_id, CloseOnClick, Closing},
+    spawner::PopupLayer,
 };
 
 pub struct PopupInteractionPlugin;
@@ -90,14 +91,14 @@ fn is_bottom_right_corner(local_hit: Vec3, size: Vec2) -> bool {
 fn on_right_drag_start(
     trigger: On<Pointer<DragStart>>,
     mut commands: Commands,
-    query: Query<&Transform>, // The base mesh is always the same 1x1 recangle
+    query: Query<(&Transform, &PopupLayer)>, // The base mesh is always the same 1x1 recangle
 ) {
     let event = trigger.event();
     if event.button != PointerButton::Secondary {
         return;
     }
 
-    let Ok((transform)) = query.get(trigger.entity) else {
+    let Ok((transform, layer)) = query.get(trigger.entity) else {
         return;
     };
 
@@ -135,7 +136,7 @@ fn on_right_drag_start(
                 camera_entity: event.hit.camera,
                 initial_offset,
             },
-            get_new_topmost_id(),
+            get_new_topmost_id(*layer),
         ));
     }
 }

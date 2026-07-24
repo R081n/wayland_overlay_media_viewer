@@ -20,6 +20,7 @@ use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 pub struct ObjectMessage {
     pub kind: ObjectType,
     pub position: PopupPosition,
+    pub layer: PopupLayer,
     pub popup_animation: PopupInAnimation,
     pub close_animation: PopupOutAnimation,
     pub behaviour: PopupInteraction,
@@ -31,6 +32,13 @@ pub struct ObjectMessage {
 pub struct ObjectCloseCondition {
     pub duration: Option<Duration>,
     pub click: Option<CloseClickSettings>,
+}
+
+#[derive(Component, Clone, Copy, Debug)]
+pub enum PopupLayer {
+    Below,
+    Normal,
+    Above,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -298,18 +306,15 @@ fn wait_for_video_to_load(
     mut videos: Query<(
         Entity,
         &VideoPlayer,
-        &mut Visibility,
         &VideoDeferredObjectMessage,
         &VideoTarget,
     )>,
     images: Res<Assets<Image>>,
 ) -> Result<(), BevyError> {
-    for (id, player, mut vis, msg, target) in videos.iter_mut() {
+    for (id, player, msg, target) in videos.iter_mut() {
         if player.played_frames == 0 {
             continue;
         }
-
-        *vis = Visibility::Visible;
 
         let mut commands = commands.entity(id);
         commands.remove::<VideoDeferredObjectMessage>();
