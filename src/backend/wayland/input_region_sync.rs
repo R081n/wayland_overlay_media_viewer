@@ -27,7 +27,6 @@ pub struct RequestInputRecalc(bool);
 impl RequestInputRecalc {
     #[track_caller]
     pub fn request(&mut self) {
-        println!("called from {}", std::panic::Location::caller());
         self.0 = true;
     }
 }
@@ -55,8 +54,6 @@ fn update_layer_shell_input_regions(
             //|| !request.0 {
             continue;
         }
-
-        dbg!("recals");
 
         let surface_info = app_state
             .surfaces

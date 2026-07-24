@@ -2,88 +2,81 @@ use std::time::Duration;
 
 use bevy::{
     color::{Color, Srgba},
-    math::{Vec2, VectorSpace},
+    math::{Vec2, Vec3, VectorSpace},
 };
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, RngExt};
 use wayland_overlay_media_viewer::{
     position::{FullScreenMode, PopupPosition},
     spawner::{
-        CloseClickSettings, Movement, ObjectCloseCondition, ObjectMessage, ObjectType, PopupImage,
-        PopupInAnimation, PopupInteraction, PopupLayer, PopupOutAnimation, PopupVideo, TextPopup,
+        CloseClickSettings, CustomShaderSource, Movement, ObjectCloseCondition, ObjectMessage,
+        ObjectType, PopupImage, PopupInAnimation, PopupInteraction, PopupLayer, PopupOutAnimation,
+        PopupVideo, TextPopup,
     },
 };
-use wgpu::PredefinedColorSpace::Srgb;
 
 fn main() {
     let sender = wayland_overlay_media_viewer::startup();
 
-    // sender.send(ObjectMessage {
-    //     kind: ObjectType::Shader(CustomShaderSource {
-    //         code: MY_WGSL_STRING.to_owned(),
-    //         duraton: 10.0,
-    //     }),
-    //     position: PopupPosition::FullScreen {
-    //         screen: 1,
-    //         relative_center: bevy::math::Vec2::ZERO,
-    //         mode: FullScreenMode::All,
-    //     },
-    //     layer: PopupLayer::Above,
-    //     popup_animation: PopupInAnimation::None,
-    //     behaviour: PopupInteraction::ClickThough,
-    //     opacity: 0.01,
-    //     close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
-    //     close_condition: ObjectCloseCondition {
-    //         duration: None,
-    //         click: None,
-    //     },
-    // });
-
     _ = sender.send(ObjectMessage {
-        kind: ObjectType::Text(TextPopup {
-            text: "this is my very fun text".to_owned(),
-            color: Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)),
-            font: bevy::text::TextFont {
-                font_size: bevy::text::FontSize::Px(30.0),
-                ..Default::default()
-            },
+        kind: ObjectType::Shader(CustomShaderSource {
+            code: MY_WGSL_STRING.to_owned(),
+            duraton: 10.0,
         }),
-        position: PopupPosition::Random,
+        position: PopupPosition::FullScreen {
+            screen: 1,
+            relative_center: bevy::math::Vec2::ZERO,
+            mode: FullScreenMode::All,
+        },
         layer: PopupLayer::Above,
         popup_animation: PopupInAnimation::None,
-        behaviour: PopupInteraction::Clickable,
-        opacity: 1.0,
+        behaviour: PopupInteraction::ClickThough,
+        opacity: 0.1,
         close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
         close_condition: ObjectCloseCondition {
             duration: None,
-            click: Some(CloseClickSettings::default()),
+            click: None,
         },
-        movement: Movement::Linear(Vec2::new(1., 0.0)),
+        movement: Movement::None,
     });
 
     let clone = sender.clone();
 
     std::thread::spawn(move || loop {
+        let rand = rand::rng().random_range(0..=25);
+        let texts = [
+            "Why???",
+            "It is done (kinda)",
+            "Now i can sleep finaly",
+            "Maybe we'll have more linux users in the future",
+            "I have bested thee, wayland",
+            "look pretty screen",
+            "Yay pretty spiral (it even extends over every screeen)",
+        ];
+
+        let idx = rand::rng().random_range(..texts.len());
         _ = clone.send(ObjectMessage {
             kind: ObjectType::Text(TextPopup {
-                text: "this is my very fun text".to_owned(),
+                text: texts[idx].to_owned(),
                 color: Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)),
                 font: bevy::text::TextFont {
                     font_size: bevy::text::FontSize::Px(30.0),
                     ..Default::default()
                 },
             }),
-            position: PopupPosition::Random,
+            position: PopupPosition::Global(Vec3::new(60.0, rand as f32, 0.0)),
             layer: PopupLayer::Above,
             popup_animation: PopupInAnimation::None,
             behaviour: PopupInteraction::Clickable,
             opacity: 1.0,
-            close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+            close_animation: PopupOutAnimation::None,
             close_condition: ObjectCloseCondition {
-                duration: None,
+                duration: Some(Duration::from_secs(30)),
                 click: Some(CloseClickSettings::default()),
             },
-            movement: Movement::Linear(Vec2::new(1., 0.0)),
+            movement: Movement::Linear(Vec2::new(-3., 0.0)),
         });
+
+        std::thread::sleep(Duration::from_millis(1000));
     });
 
     for line in std::io::stdin().lines() {
@@ -109,16 +102,16 @@ fn main() {
                             position: PopupPosition::Random,
                             popup_animation: PopupInAnimation::SlideFadeIn,
                             behaviour: PopupInteraction::Clickable,
-                            opacity: 0.9,
+                            opacity: 0.3,
                             layer: PopupLayer::Normal,
                             close_animation: PopupOutAnimation::FadeOut { decay_rate: 5.0 },
                             close_condition: ObjectCloseCondition {
-                                duration: None,
+                                duration: Some(Duration::from_secs(10)),
                                 click: Some(CloseClickSettings::default()),
                             },
                             movement: Movement::None,
                         });
-                        std::thread::sleep(Duration::from_millis(1000));
+                        std::thread::sleep(Duration::from_millis(2000));
                     }
                 });
             }

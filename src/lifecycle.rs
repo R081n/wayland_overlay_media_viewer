@@ -109,6 +109,13 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         }
     }
 
+    match msg.movement {
+        crate::spawner::Movement::None => {}
+        crate::spawner::Movement::Linear(vec2) => {
+            commands.insert(LinearMovement(vec2));
+        }
+    }
+
     commands.insert((
         TargetOpacity(msg.opacity),
         ProxyOpacity(msg.opacity),
@@ -121,6 +128,8 @@ pub struct LiveCyclePlugin;
 impl Plugin for LiveCyclePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (handle_slide_fade_in, handle_closing).chain())
+            //No special ordering
+            .add_systems(Update, handle_moving)
             .add_systems(First, make_visible_on_the_second_frame)
             .add_observer(handle_random_position)
             .add_observer(place_at_sceen_pos)
@@ -386,6 +395,21 @@ fn make_visible_on_the_second_frame(
         *vis = Visibility::Visible;
 
         commands.entity(id).remove::<SetPopupVisibleNextFrame>();
+        input_recalc.request();
+    }
+}
+
+#[derive(Component)]
+struct LinearMovement(Vec2);
+fn handle_moving(
+    query: Query<(&mut Transform, &LinearMovement)>,
+    time: Res<Time>,
+
+    mut input_recalc: ResMut<RequestInputRecalc>,
+) {
+    for (mut transform, movement) in query {
+        let delta = time.delta_secs();
+        transform.translation += movement.0.extend(0.0) * delta;
         input_recalc.request();
     }
 }

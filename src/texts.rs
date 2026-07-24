@@ -67,7 +67,7 @@ fn update_text(
             node.top = Val::Px(target_viewport_position.y - computed_node.size.y / 2.0);
 
             if opacity.0 != text_color.0.alpha() {
-                text_color.0.set_alpha(dbg!(opacity.0));
+                text_color.0.set_alpha(opacity.0);
             }
 
             if !target_transform
