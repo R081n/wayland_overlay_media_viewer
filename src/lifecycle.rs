@@ -14,6 +14,11 @@ use crate::{
     spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
     Clickable,
 };
+static NEXT_ID: AtomicI64 = AtomicI64::new(0);
+
+pub fn get_new_topmost_id() -> DrawOrder {
+    DrawOrder(NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+}
 
 pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) {
     match msg.position {
@@ -52,18 +57,14 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
                 Clickable,
                 Pickable {
                     is_hoverable: true,
-                    should_block_lower: true,
+                    // Order is done via the DrawOrder struct
+                    should_block_lower: false,
                 },
             ));
         }
     }
 
-    static NEXT_ID: AtomicI64 = AtomicI64::new(0);
-
-    commands.insert((
-        TargetOpacity(msg.opacity),
-        DrawOrder(NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)),
-    ));
+    commands.insert((TargetOpacity(msg.opacity), get_new_topmost_id()));
 }
 
 pub struct LiveCyclePlugin;

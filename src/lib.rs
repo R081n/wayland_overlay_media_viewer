@@ -45,7 +45,6 @@ use crate::{
     draw_order::CustomDrawOrderPlugin,
     interaction::PopupInteractionPlugin,
     lifecycle::LiveCyclePlugin,
-    pointer_visualization_plugin::PointerVisualizerPlugin,
     spawner::{preload_asset, ObjectMessage, PopupPlugin},
     videos::plugin::VideoPlugin,
 };
@@ -116,7 +115,6 @@ fn startup_inner(rx: DataReceiver) {
         AnimatedImagePlugin,
         CustomDrawOrderPlugin,
         PopupInteractionPlugin,
-        MeshPickingPlugin,
         EntropyPlugin::<WyRand>::default(),
     ));
 

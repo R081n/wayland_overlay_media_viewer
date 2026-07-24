@@ -11,7 +11,10 @@ use bevy::{
     prelude::*,
 };
 
-use crate::{draw_order::DrawOrder, lifecycle::Closing};
+use crate::{
+    draw_order::DrawOrder,
+    lifecycle::{get_new_topmost_id, Closing},
+};
 
 pub struct PopupInteractionPlugin;
 
@@ -50,11 +53,8 @@ impl Plugin for PopupInteractionPlugin {
 pub struct RightDragging {
     pub pointer_id: PointerId,
     pub camera_entity: Entity,
-    // 💡 THE FIX: Store the spatial offset between the object's center and the mouse hit point
     pub initial_offset: Vec3,
 }
-// --- Observers (Bevy 0.19 Native Interaction Architecture) ---
-
 // --- Observers (Bevy 0.19 Native Interaction Architecture) ---
 
 /// Listens globally for drag actions to filter for Right Mouse clicks and stores the initial offset.
@@ -79,11 +79,14 @@ fn on_right_drag_start(
         // Calculate the relative vector offset
         let initial_offset = object_center - hit_point;
 
-        commands.entity(trigger.entity).insert(RightDragging {
-            pointer_id: event.pointer_id,
-            camera_entity: event.hit.camera,
-            initial_offset, // 👈 Saved for continuous tracking
-        });
+        commands.entity(trigger.entity).insert((
+            RightDragging {
+                pointer_id: event.pointer_id,
+                camera_entity: event.hit.camera,
+                initial_offset,
+            },
+            get_new_topmost_id(),
+        ));
     }
 }
 
@@ -194,43 +197,48 @@ fn populate_ray_map_manually(
 /// calculate pointer hits against items in the scene.
 fn evaluate_hits_manually_fallback(
     ray_map: Res<RayMap>,
-    // 💡 High-utility structural parameter that executes geometric ray intersects directly
     mut ray_cast: MeshRayCast,
-    mut hits: MessageWriter<PointerHits>,
+    mut hits_writer: MessageWriter<PointerHits>,
     render_order: Query<&DrawOrder>,
 ) {
-    // Keep track of our hits for this frame loop
+    let mut max = i64::MIN;
+    let mut closest = None;
     let mut fresh_hits = Vec::new();
-
-    let max = render_order.iter().map(|d| d.0).max().unwrap_or_default();
 
     // Iterate through all custom rays currently registered in the map
     for (ray_id, ray) in ray_map.iter() {
         if ray_id.pointer == PointerId::Mouse {
             // Execute the structural geometric raycast against the world scene elements
-            let hits = ray_cast.cast_ray(*ray, &MeshRayCastSettings::default());
+            let hits = ray_cast.cast_ray(*ray, &MeshRayCastSettings::default().never_early_exit());
+            dbg!(hits.len());
 
             for (entity, hit) in hits {
                 // Map the hit data back into a format Bevy's interaction observers understand
                 let order = render_order.get(*entity).map(|d| d.0).unwrap_or_default();
-
-                fresh_hits.push((
-                    *entity,
-                    HitData {
-                        depth: hit.distance + (max - order) as f32,
-                        position: Some(hit.point),
-                        normal: Some(hit.normal),
-                        camera: ray_id.camera,
-                        extra: None,
-                    },
-                ));
+                if order > max {
+                    closest = Some((
+                        *entity,
+                        HitData {
+                            depth: hit.distance,
+                            position: Some(hit.point),
+                            normal: Some(hit.normal),
+                            camera: ray_id.camera,
+                            extra: None,
+                        },
+                    ));
+                    max = order;
+                }
             }
         }
     }
 
-    hits.write(PointerHits {
+    if let Some(closest) = closest {
+        fresh_hits.push(closest);
+    }
+
+    hits_writer.write(PointerHits {
         pointer: PointerId::Mouse,
         picks: fresh_hits,
-        order: 0.0,
+        order: 10.0,
     });
 }
