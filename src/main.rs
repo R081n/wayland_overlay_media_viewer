@@ -34,45 +34,51 @@ fn main() {
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
 
-        if let Ok(dir) = std::fs::read_dir(&line) {
-            let sender = sender.clone();
-            std::thread::spawn(move || {
-                let mut list: Vec<_> = dir.flatten().collect();
-                list.shuffle(&mut rand::rng());
+        for link in line
+            .split(['\'', '"'])
+            .map(|p| p.trim())
+            .filter(|p| !p.is_empty())
+        {
+            if let Ok(dir) = std::fs::read_dir(&link) {
+                let sender = sender.clone();
+                std::thread::spawn(move || {
+                    let mut list: Vec<_> = dir.flatten().collect();
+                    list.shuffle(&mut rand::rng());
 
-                for entry in list {
-                    sender.send(ObjectMessage {
-                        kind: ObjectType::Image(PopupImage {
-                            uri: entry.path().to_string_lossy().into_owned(),
-                        }),
+                    for entry in list {
+                        sender.send(ObjectMessage {
+                            kind: ObjectType::Image(PopupImage {
+                                uri: entry.path().to_string_lossy().into_owned(),
+                            }),
 
-                        position: PopupPosition::Random,
-                        popup_animation: PopupInAnimation::SlideFadeIn,
-                        behaviour: PopupInteraction::Clickable,
-                        opacity: 0.9,
-                        close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
-                        close_condition: ObjectCloseCondition {
-                            duration: None,
-                            click: Some(CloseClickSettings::default()),
-                        },
-                    });
-                    std::thread::sleep(Duration::from_millis(1000));
-                }
+                            position: PopupPosition::Random,
+                            popup_animation: PopupInAnimation::SlideFadeIn,
+                            behaviour: PopupInteraction::Clickable,
+                            opacity: 0.9,
+                            close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+                            close_condition: ObjectCloseCondition {
+                                duration: None,
+                                click: Some(CloseClickSettings::default()),
+                            },
+                        });
+                        std::thread::sleep(Duration::from_millis(1000));
+                    }
+                });
+            }
+
+            sender.send(ObjectMessage {
+                kind: to_type(link.to_owned()),
+                position: PopupPosition::Random,
+                popup_animation: PopupInAnimation::SlideFadeIn,
+                behaviour: PopupInteraction::Clickable,
+                opacity: 0.9,
+                close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+                close_condition: ObjectCloseCondition {
+                    duration: None,
+                    click: Some(CloseClickSettings::default()),
+                },
             });
         }
-
-        sender.send(ObjectMessage {
-            kind: to_type(line),
-            position: PopupPosition::Random,
-            popup_animation: PopupInAnimation::SlideFadeIn,
-            behaviour: PopupInteraction::Clickable,
-            opacity: 0.9,
-            close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
-            close_condition: ObjectCloseCondition {
-                duration: None,
-                click: Some(CloseClickSettings::default()),
-            },
-        });
     }
 }
 

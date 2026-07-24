@@ -11,7 +11,7 @@ pub mod lifecycle;
 pub mod position;
 pub mod shader;
 pub mod spawner;
-pub mod texts;
+//pub mod texts;
 pub mod videos;
 
 use std::time::Duration;

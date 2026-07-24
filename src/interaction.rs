@@ -55,30 +55,80 @@ pub struct RightDragging {
     pub camera_entity: Entity,
     pub initial_offset: Vec3,
 }
-// --- Observers (Bevy 0.19 Native Interaction Architecture) ---
+/// State stored during a resize operation.
+#[derive(Component)]
+pub struct RightResizing {
+    pub pointer_id: PointerId,
+    pub camera_entity: Entity,
+    pub initial_scale: Vec3,
+    pub initial_hit_local: Vec3,
+    pub object_size: Vec2,
+    pub initial_translation: Vec3,
+    /// The static 3D world position of the top-left corner when the drag started
+    pub top_left_world_anchor: Vec3,
+    /// The initial vector from the top-left anchor to the initial click point
+    pub initial_anchor_to_hit_distance: f32,
+}
 
-/// Listens globally for drag actions to filter for Right Mouse clicks and stores the initial offset.
+/// Determines if the click occurred in the bottom-right corner of the entity.
+fn is_bottom_right_corner(local_hit: Vec3, size: Vec2) -> bool {
+    let half_width = size.x / 2.0;
+    let half_height = size.y / 2.0;
+
+    // Bottom-right in Bevy 2D coordinates (Positive X, Negative Y)
+    let target_x = half_width;
+    let target_y = -half_height;
+
+    // Define a grab threshold (e.g., within 20% of the object's total size)
+    let threshold_x = size.x * 0.2;
+    let threshold_y = size.y * 0.2;
+
+    (local_hit.x - target_x).abs() < threshold_x && (local_hit.y - target_y).abs() < threshold_y
+}
+
+/// Listens globally for drag actions to filter for Right Mouse clicks, branching into drag or resize.
 fn on_right_drag_start(
     trigger: On<Pointer<DragStart>>,
     mut commands: Commands,
-    query: Query<&Transform>,
+    query: Query<&Transform>, // The base mesh is always the same 1x1 recangle
 ) {
     let event = trigger.event();
+    if event.button != PointerButton::Secondary {
+        return;
+    }
 
-    if event.button == PointerButton::Secondary {
-        // Fetch the object's starting translation to calculate the delta
-        let object_center = query
-            .get(trigger.entity)
-            .map(|t| t.translation)
-            .unwrap_or(Vec3::ZERO);
+    let Ok((transform)) = query.get(trigger.entity) else {
+        return;
+    };
 
-        // Fetch where the cursor ray physically intersected the mesh surface.
-        // Fallback to the object's center if the hit position is somehow undefined.
-        let hit_point = event.hit.position.unwrap_or(object_center);
+    let object_center = transform.translation;
+    let hit_point = event.hit.position.unwrap_or(object_center);
 
-        // Calculate the relative vector offset
+    // Transform the world hit position into the object's local coordinate space
+
+    let local_hit = transform.to_matrix().inverse().transform_point3(hit_point);
+
+    let object_size = Vec2::ONE;
+
+    if is_bottom_right_corner(local_hit, object_size) {
+        let top_left_world_anchor = transform.translation
+            + transform.scale * Vec3::new(-0.5, 0.5, 0.0) * object_size.extend(1.);
+        let initial_anchor_to_hit_distance = top_left_world_anchor.distance(hit_point);
+
+        // Initialize Resizing State
+        commands.entity(trigger.entity).insert(RightResizing {
+            pointer_id: event.pointer_id,
+            camera_entity: event.hit.camera,
+            initial_scale: transform.scale,
+            initial_hit_local: local_hit,
+            object_size,
+            initial_translation: transform.translation,
+            initial_anchor_to_hit_distance,
+            top_left_world_anchor,
+        });
+    } else {
+        // Initialize Normal Dragging State
         let initial_offset = object_center - hit_point;
-
         commands.entity(trigger.entity).insert((
             RightDragging {
                 pointer_id: event.pointer_id,
@@ -90,59 +140,105 @@ fn on_right_drag_start(
     }
 }
 
-/// Listens globally for continuous cursor tracking movements, preserving the original hit offset.
+/// Handles continuous cursor tracking for both dragging and resizing behaviors.
 fn on_right_dragging(
     trigger: On<Pointer<Drag>>,
-    // TODO render order,
-    mut dragged_entities: Query<(&mut Transform, &RightDragging)>,
+    mut dragged_entities: Query<(
+        &mut Transform,
+        Option<&RightDragging>,
+        Option<&RightResizing>,
+    )>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
 ) {
     let event = trigger.event();
-
-    let Ok((mut transform, dragging)) = dragged_entities.get_mut(trigger.entity) else {
+    let Ok((mut transform, dragging, resizing)) = dragged_entities.get_mut(trigger.entity) else {
         return;
     };
 
-    if event.pointer_id != dragging.pointer_id {
+    // BRANCH 1: Resize Behavior
+    if let Some(resize) = resizing {
+        if event.pointer_id != resize.pointer_id {
+            return;
+        }
+        let Ok((camera, camera_transform)) = camera_query.get(resize.camera_entity) else {
+            return;
+        };
+
+        if let Ok(ray) = camera.viewport_to_world(camera_transform, event.pointer_location.position)
+        {
+            let camera_forward = camera_transform.forward();
+            let denominator = ray.direction.dot(*camera_forward);
+
+            if denominator.abs() > f32::EPSILON {
+                // Find where the ray intersects the virtual flat plane matching our anchor depth
+                let distance =
+                    (resize.top_left_world_anchor - ray.origin).dot(*camera_forward) / denominator;
+                let current_ray_intersection = ray.origin + ray.direction * distance;
+
+                // Calculate current distance from the immutable top-left anchor to the cursor
+                let current_distance = resize
+                    .top_left_world_anchor
+                    .distance(current_ray_intersection);
+
+                // Scale multiplier is directly proportional to how much further away the cursor is
+                let scale_factor = current_distance / resize.initial_anchor_to_hit_distance;
+
+                // Clamping threshold to prevent inversion loops
+                if scale_factor > 0.05 {
+                    // 1. Uniformly scale based on the distance ratio
+                    let new_scale =
+                        resize.initial_scale * Vec3::new(scale_factor, scale_factor, 1.0);
+
+                    // 2. Calculate the original offset vector from the anchor to the initial center
+                    let initial_anchor_to_center =
+                        resize.initial_translation - resize.top_left_world_anchor;
+
+                    // 3. Scale that offset vector by our scale factor
+                    let current_anchor_to_center = initial_anchor_to_center * scale_factor;
+
+                    // 4. Update both variables simultaneously
+                    // The new center moves dynamically relative to the completely frozen top-left corner
+                    transform.scale = new_scale;
+                    transform.translation = resize.top_left_world_anchor + current_anchor_to_center;
+                }
+            }
+        }
         return;
     }
 
-    let Ok((camera, camera_transform)) = camera_query.get(dragging.camera_entity) else {
-        return;
-    };
+    // BRANCH 2: Drag Behavior
+    if let Some(drag) = dragging {
+        if event.pointer_id != drag.pointer_id {
+            return;
+        }
+        let Ok((camera, camera_transform)) = camera_query.get(drag.camera_entity) else {
+            return;
+        };
 
-    // Use the stored offset to locate the virtual plane depth where the drag loop was initiated
-    let original_object_center = transform.translation;
-    let original_hit_point = original_object_center - dragging.initial_offset;
+        let original_object_center = transform.translation;
+        let original_hit_point = original_object_center - drag.initial_offset;
 
-    if let Ok(ray) = camera.viewport_to_world(camera_transform, event.pointer_location.position) {
-        let camera_forward = camera_transform.forward();
-        let denominator = ray.direction.dot(*camera_forward);
+        if let Ok(ray) = camera.viewport_to_world(camera_transform, event.pointer_location.position)
+        {
+            let camera_forward = camera_transform.forward();
+            let denominator = ray.direction.dot(*camera_forward);
 
-        if denominator.abs() > f32::EPSILON {
-            // Find where the ray intersects the virtual flat plane passing through our original hit point
-            let distance = (original_hit_point - ray.origin).dot(*camera_forward) / denominator;
-            let current_ray_intersection = ray.origin + ray.direction * distance;
-
-            transform.translation = current_ray_intersection + dragging.initial_offset;
+            if denominator.abs() > f32::EPSILON {
+                let distance = (original_hit_point - ray.origin).dot(*camera_forward) / denominator;
+                let current_ray_intersection = ray.origin + ray.direction * distance;
+                transform.translation = current_ray_intersection + drag.initial_offset;
+            }
         }
     }
 }
 
-/// Cleans up state assignments when the user terminates the drag event.
-fn on_right_drag_end(
-    trigger: On<Pointer<DragEnd>>,
-    mut commands: Commands,
-    dragged_entities: Query<&RightDragging>,
-) {
-    let event = trigger.event();
-
-    if let Ok(dragging) = dragged_entities.get(trigger.entity)
-        && event.pointer_id == dragging.pointer_id {
-            commands.entity(trigger.entity).remove::<RightDragging>();
-        }
+/// Cleans up any active interaction states.
+fn on_right_drag_end(trigger: On<Pointer<DragEnd>>, mut commands: Commands) {
+    commands
+        .entity(trigger.entity)
+        .remove::<RightDragging>()
+        .remove::<RightResizing>();
 }
-
 
 fn on_left_click(
     trigger: On<Pointer<Click>>,
