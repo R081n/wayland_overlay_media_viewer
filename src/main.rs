@@ -5,32 +5,32 @@ use rand::seq::SliceRandom;
 use wayland_overlay_media_viewer::{
     position::PopupPosition,
     spawner::{
-        CustomShaderSource, ObjectCloseCondition, ObjectMessage, ObjectType, PopupImage,
-        PopupInAnimation, PopupInteraction, PopupOutAnimation, PopupVideo,
+        CloseClickSettings, CustomShaderSource, ObjectCloseCondition, ObjectMessage, ObjectType,
+        PopupImage, PopupInAnimation, PopupInteraction, PopupOutAnimation, PopupVideo,
     },
 };
 
 fn main() {
     let sender = wayland_overlay_media_viewer::startup();
 
-    sender.send(ObjectMessage {
-        kind: ObjectType::Shader(CustomShaderSource {
-            code: MY_WGSL_STRING.to_owned(),
-            duraton: 10.0,
-        }),
-        position: PopupPosition::FullScreeAll {
-            screen: 1,
-            relative_center: Vec2::ZERO,
-        },
-        popup_animation: PopupInAnimation::None,
-        behaviour: PopupInteraction::ClickThough,
-        opacity: 0.5,
-        close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
-        close_condition: ObjectCloseCondition {
-            duration: None,
-            click: None,
-        },
-    });
+    // sender.send(ObjectMessage {
+    //     kind: ObjectType::Shader(CustomShaderSource {
+    //         code: MY_WGSL_STRING.to_owned(),
+    //         duraton: 10.0,
+    //     }),
+    //     position: PopupPosition::FullScreeAll {
+    //         screen: 1,
+    //         relative_center: Vec2::ZERO,
+    //     },
+    //     popup_animation: PopupInAnimation::None,
+    //     behaviour: PopupInteraction::ClickThough,
+    //     opacity: 0.1,
+    //     close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+    //     close_condition: ObjectCloseCondition {
+    //         duration: None,
+    //         click: None,
+    //     },
+    // });
 
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
@@ -54,7 +54,7 @@ fn main() {
                         close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
                         close_condition: ObjectCloseCondition {
                             duration: None,
-                            click: None,
+                            click: Some(CloseClickSettings::default()),
                         },
                     });
                     std::thread::sleep(Duration::from_millis(1000));
@@ -71,7 +71,7 @@ fn main() {
             close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
             close_condition: ObjectCloseCondition {
                 duration: None,
-                click: None,
+                click: Some(CloseClickSettings::default()),
             },
         });
     }

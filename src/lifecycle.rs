@@ -71,12 +71,17 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         });
     }
 
-    if let Some(duration) = &close.click {
+    if let Some(_) = &close.click {
         commands.insert(CloseOnClick);
     }
 
     match msg.behaviour {
-        crate::spawner::PopupInteraction::ClickThough => {}
+        crate::spawner::PopupInteraction::ClickThough => {
+            commands.insert((Pickable {
+                is_hoverable: false,
+                should_block_lower: false,
+            },));
+        }
         crate::spawner::PopupInteraction::Clickable => {
             commands.insert((
                 Clickable,
@@ -302,9 +307,6 @@ fn place_at_sceen_pos(
     mut objects: Query<&mut Transform>,
     screens: Query<&ScreenPosition>,
 ) -> Result<(), BevyError> {
-    let screen_ids = screens.iter().collect::<Vec<_>>();
-    dbg!(screen_ids);
-
     let screen = screens
         .iter()
         .find(|s| s.index == trigger.screen)

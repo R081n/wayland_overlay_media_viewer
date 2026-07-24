@@ -17,8 +17,9 @@ use std::time::Duration;
 
 pub use backend::*;
 use bevy::{
+    DefaultPlugins,
     app::{App, PluginGroup as _, PreUpdate, Startup, TerminalCtrlCHandlerPlugin, Update},
-    asset::{io::web::WebAssetPlugin, AssetPlugin},
+    asset::{AssetPlugin, io::web::WebAssetPlugin},
     camera::ClearColor,
     color::Color,
     dev_tools::picking_debug::DebugPickingMode,
@@ -32,7 +33,6 @@ use bevy::{
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::WindowPlugin,
     winit::WinitPlugin,
-    DefaultPlugins,
 };
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
@@ -45,7 +45,7 @@ use crate::{
     lifecycle::LiveCyclePlugin,
     position::ScreenPosition,
     shader::DynamicShaderPlugin,
-    spawner::{preload_asset, ObjectMessage, PopupPlugin},
+    spawner::{ObjectMessage, PopupPlugin, preload_asset},
     videos::plugin::VideoPlugin,
 };
 

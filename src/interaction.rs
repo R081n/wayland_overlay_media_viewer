@@ -1,19 +1,20 @@
 use bevy::{
     camera::{NormalizedRenderTarget, RenderTarget},
     picking::{
-        PickingSystems,
         backend::{
-            HitData, PointerHits,
             ray::{RayId, RayMap},
+            HitData, PointerHits,
         },
         pointer::{PointerButton, PointerId, PointerLocation},
+        PickingSystems,
     },
     prelude::*,
 };
 
 use crate::{
     draw_order::DrawOrder,
-    lifecycle::{CloseOnClick, Closing, get_new_topmost_id},
+    lifecycle::{get_new_topmost_id, CloseOnClick, Closing},
+    Clickable,
 };
 
 pub struct PopupInteractionPlugin;
@@ -145,10 +146,14 @@ fn on_right_drag_end(
     }
 }
 
-fn on_left_click(trigger: On<Pointer<Click>, CloseOnClick>, mut commands: Commands) {
+fn on_left_click(
+    trigger: On<Pointer<Click>>,
+    mut commands: Commands,
+    query: Query<Has<CloseOnClick>>,
+) {
     let event = trigger.event();
 
-    if event.button != PointerButton::Primary {
+    if event.button != PointerButton::Primary || !query.get(event.entity).unwrap_or_default() {
         return;
     }
 

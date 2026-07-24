@@ -134,11 +134,7 @@ pub fn wayland_event_system(
             );
             surface_descriptor.upsert_surface(
                 surface_config,
-                spawn_camera(
-                    &mut commands,
-                    &mut images,
-                    surface_config,
-                ),
+                spawn_camera(&mut commands, &mut images, surface_config),
             );
             touched = true;
         }

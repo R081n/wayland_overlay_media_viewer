@@ -3,6 +3,7 @@ pub mod input_region_sync;
 pub mod render;
 pub mod surface;
 
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
@@ -15,6 +16,8 @@ use wayland_client::{
         wl_callback, wl_compositor, wl_output, wl_pointer, wl_registry, wl_seat, wl_surface,
     },
 };
+use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::WpCursorShapeDeviceV1;
+use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_manager_v1::WpCursorShapeManagerV1;
 use wayland_protocols::xdg::xdg_output::zv1::client::{zxdg_output_manager_v1, zxdg_output_v1};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
@@ -47,6 +50,8 @@ pub(crate) struct WaylandAppState {
     pub surface_to_output: HashMap<u32, u32>,
     pub xdg_output_manager: Option<zxdg_output_manager_v1::ZxdgOutputManagerV1>,
     pub xdg_outputs: HashMap<u32, zxdg_output_v1::ZxdgOutputV1>,
+    pub cursor_shape_manager: Option<WpCursorShapeManagerV1>,
+    pub cursor_shape_devices: HashMap<u32, WpCursorShapeDeviceV1>,
 }
 
 pub(crate) struct OutputSurface {
@@ -110,6 +115,8 @@ impl WaylandAppState {
             surface_to_output: HashMap::new(),
             xdg_output_manager: None,
             xdg_outputs: HashMap::new(),
+            cursor_shape_manager: None,
+            cursor_shape_devices: HashMap::new(),
         }
     }
 
@@ -153,6 +160,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WaylandAppState {
             } => {
                 let _span_guard =
                     trace_span!("wl_registry::Event::Global", name, interface, version).entered();
+
                 match interface.as_str() {
                     "wl_compositor" => {
                         info!("Compositor found: {} (version {})", name, version);
@@ -177,6 +185,13 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WaylandAppState {
                     "zxdg_output_manager_v1" => {
                         info!("xdg_output_manager found: {} (version {})", name, version);
                         state.xdg_output_manager = Some(registry.bind(name, version, qh, ()));
+                    }
+                    "wp_cursor_shape_manager_v1" => {
+                        info!(
+                            "wp_cursor_shape_manager_v1 found: {} (version {})",
+                            name, version
+                        );
+                        state.cursor_shape_manager = Some(registry.bind(name, version, qh, ()))
                     }
                     _ => {}
                 }
@@ -258,10 +273,17 @@ impl Dispatch<wl_seat::WlSeat, ()> for WaylandAppState {
                 let seat_id = seat.id().protocol_id();
 
                 if has_pointer {
-                    state
-                        .pointers
-                        .entry(seat_id)
-                        .or_insert_with(|| seat.get_pointer(qh, seat_id));
+                    match state.pointers.entry(seat_id) {
+                        Entry::Occupied(_) => todo!(),
+                        Entry::Vacant(entry) => {
+                            let pointer = seat.get_pointer(qh, seat_id);
+                            if let Some(manager) = &state.cursor_shape_manager {
+                                let pointer = manager.get_pointer(&pointer, qh, ());
+                                state.cursor_shape_devices.insert(seat_id, pointer);
+                            };
+                            entry.insert(pointer);
+                        }
+                    }
                 } else if let Some(pointer) = state.pointers.remove(&seat_id) {
                     pointer.release();
                 }
@@ -277,7 +299,7 @@ impl Dispatch<wl_pointer::WlPointer, u32> for WaylandAppState {
         state: &mut Self,
         _pointer: &wl_pointer::WlPointer,
         event: wl_pointer::Event,
-        _seat_id: &u32,
+        seat_id: &u32,
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
     ) {
@@ -286,8 +308,13 @@ impl Dispatch<wl_pointer::WlPointer, u32> for WaylandAppState {
                 surface,
                 surface_x,
                 surface_y,
+                serial,
                 ..
             } => {
+                if let Some(cursor_device) = &mut state.cursor_shape_devices.get(seat_id) {
+                    // TODO special cursor shapes
+                    cursor_device.set_shape(serial, wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape::Pointer);
+                }
                 let output = state
                     .surface_to_output
                     .get(&surface.id().protocol_id())
@@ -598,5 +625,29 @@ impl Dispatch<WlRegion, ()> for WaylandAppState {
         _qhandle: &QueueHandle<Self>,
     ) {
         todo!()
+    }
+}
+
+impl Dispatch<WpCursorShapeManagerV1, ()> for WaylandAppState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WpCursorShapeManagerV1,
+        _event: <WpCursorShapeManagerV1 as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<WpCursorShapeDeviceV1, ()> for WaylandAppState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WpCursorShapeDeviceV1,
+        _event: <WpCursorShapeDeviceV1 as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
     }
 }
