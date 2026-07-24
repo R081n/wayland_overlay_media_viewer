@@ -7,6 +7,8 @@ use std::{
 use crate::{
     animated_image::{Gif3d, GifAsset},
     lifecycle::handle_slide_fade_in,
+    position::ScreenPosition,
+    shader::{DynamicMaterial, ShaderRepeatPeriod, SHADER_TEMPLATE},
 };
 use crate::{
     lifecycle,
@@ -42,8 +44,8 @@ pub struct TargetOpacity(pub f32);
 pub enum ObjectType {
     Image(PopupImage),
     Video(PopupVideo),
+    Shader(CustomShaderSource),
     // Text,
-    //Shader,
 }
 
 #[derive(Debug, Clone)]
@@ -62,7 +64,9 @@ pub enum PopupInAnimation {
 pub enum PopupOutAnimation {
     #[default]
     None,
-    FadeOut,
+    FadeOut {
+        decay_rate: f32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +86,11 @@ pub struct PopupVideo {
     pub uri: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct CustomShaderSource {
+    pub code: String,
+    pub duraton: f32,
+}
 pub struct PopupPlugin;
 
 impl Plugin for PopupPlugin {
@@ -96,6 +105,7 @@ impl Plugin for PopupPlugin {
                     preload_asset,
                     spawn_object,
                     spawn_videos,
+                    spawn_shaders,
                     wait_for_video_to_load,
                 )
                     .chain()
@@ -138,7 +148,8 @@ pub fn preload_asset(
             }
 
             // Handeled differently
-            ObjectType::Video(_popup_video) => continue,
+            ObjectType::Video(_) => continue,
+            ObjectType::Shader(_) => continue,
         };
 
         pendnig
@@ -215,6 +226,7 @@ fn spawn_object(
                 }
                 // Not handled here
                 ObjectType::Video(_) => continue,
+                ObjectType::Shader(_) => continue,
             };
 
             common
@@ -223,7 +235,7 @@ fn spawn_object(
                 .or_default()
                 .and_modify(move |mut t| *t = t.with_scale(common.scale));
 
-            lifecycle::insert_components(&mut common.commands, msg);
+            lifecycle::insert_components(&mut common.commands, &msg);
         }
     }
 
@@ -298,8 +310,6 @@ fn wait_for_video_to_load(
             continue;
         }
 
-        let msg = msg.0.clone();
-
         *vis = Visibility::Visible;
 
         let mut commands = commands.entity(id);
@@ -314,8 +324,39 @@ fn wait_for_video_to_load(
             .or_default()
             .and_modify(move |mut t| *t = t.with_scale(scale));
 
-        lifecycle::insert_components(&mut commands, msg);
+        lifecycle::insert_components(&mut commands, &msg.0);
     }
 
     Ok(())
+}
+
+fn spawn_shaders(
+    mut commands: Commands,
+    mut new: MessageReader<ObjectMessage>,
+    default_meshes: Res<DefaultMeshes>,
+    mut shaders: ResMut<Assets<Shader>>,
+    mut shader_material: ResMut<Assets<DynamicMaterial>>,
+) {
+    for new in new.read() {
+        let ObjectType::Shader(custom_shader_source) = &new.kind else {
+            continue;
+        };
+
+        let shader_asset = Shader::from_wgsl(
+            SHADER_TEMPLATE.replace("###CodeHere###", &custom_shader_source.code),
+            "runtime_extension.wgsl",
+        );
+
+        let shader = shaders.add(shader_asset);
+        let dyn_shader = shader_material.add(DynamicMaterial::new(new.opacity, shader));
+
+        let mut commands = commands.spawn((
+            MeshMaterial3d(dyn_shader.clone()),
+            Mesh3d(default_meshes.rect.clone()),
+            ShaderRepeatPeriod::new(custom_shader_source.duraton),
+            Transform::from_scale(Vec3::ONE),
+        ));
+
+        lifecycle::insert_components(&mut commands, new);
+    }
 }

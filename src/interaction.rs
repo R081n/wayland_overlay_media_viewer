@@ -1,19 +1,19 @@
 use bevy::{
     camera::{NormalizedRenderTarget, RenderTarget},
     picking::{
+        PickingSystems,
         backend::{
-            ray::{RayId, RayMap},
             HitData, PointerHits,
+            ray::{RayId, RayMap},
         },
         pointer::{PointerButton, PointerId, PointerLocation},
-        PickingSystems,
     },
     prelude::*,
 };
 
 use crate::{
     draw_order::DrawOrder,
-    lifecycle::{get_new_topmost_id, Closing},
+    lifecycle::{CloseOnClick, Closing, get_new_topmost_id},
 };
 
 pub struct PopupInteractionPlugin;
@@ -145,7 +145,7 @@ fn on_right_drag_end(
     }
 }
 
-fn on_left_click(trigger: On<Pointer<Click>>, mut commands: Commands) {
+fn on_left_click(trigger: On<Pointer<Click>, CloseOnClick>, mut commands: Commands) {
     let event = trigger.event();
 
     if event.button != PointerButton::Primary {
@@ -210,7 +210,6 @@ fn evaluate_hits_manually_fallback(
         if ray_id.pointer == PointerId::Mouse {
             // Execute the structural geometric raycast against the world scene elements
             let hits = ray_cast.cast_ray(*ray, &MeshRayCastSettings::default().never_early_exit());
-            dbg!(hits.len());
 
             for (entity, hit) in hits {
                 // Map the hit data back into a format Bevy's interaction observers understand

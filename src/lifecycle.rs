@@ -4,7 +4,9 @@ use std::{
     time::Duration,
 };
 
-use bevy::{math::I64Vec2, prelude::*};
+use bevy::{
+    light::NotShadowCaster, math::I64Vec2, prelude::*, render::batching::NoAutomaticBatching,
+};
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
@@ -20,7 +22,15 @@ pub fn get_new_topmost_id() -> DrawOrder {
     DrawOrder(NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
 }
 
-pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) {
+pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage) {
+    // Bevy Settngs
+    commands.insert((
+        // Almost no shared materials
+        NoAutomaticBatching,
+        // No Shadows
+        NotShadowCaster,
+    ));
+
     match msg.position {
         PopupPosition::Global(vec3) => {
             commands
@@ -31,6 +41,17 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
         PopupPosition::SceenSpace(_, _vec2) => todo!(),
         PopupPosition::Random => {
             commands.trigger(PlaceAtRandomPosition);
+        }
+        PopupPosition::FullScreeAll {
+            screen,
+            relative_center,
+        } => {
+            commands.trigger(|entity| PlaceAtScreenPos {
+                entity,
+                screen,
+                relative_center,
+                mode: FullScreenMode::All,
+            });
         }
     }
 
@@ -48,6 +69,10 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
             duration,
             kind: msg.close_animation,
         });
+    }
+
+    if let Some(duration) = &close.click {
+        commands.insert(CloseOnClick);
     }
 
     match msg.behaviour {
@@ -73,6 +98,7 @@ impl Plugin for LiveCyclePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (handle_slide_fade_in, handle_closing).chain())
             .add_observer(handle_random_position)
+            .add_observer(place_at_sceen_pos)
             .add_observer(on_close_in);
     }
 }
@@ -210,6 +236,9 @@ fn handle_random_position(
     Ok(())
 }
 
+#[derive(Component)]
+pub struct CloseOnClick;
+
 #[derive(EntityEvent)]
 struct CloseInDuration {
     entity: Entity,
@@ -239,7 +268,7 @@ fn handle_closing(
     for (id, closing, handle) in closing.iter_mut() {
         match closing.kind {
             PopupOutAnimation::None => commands.entity(id).despawn(),
-            PopupOutAnimation::FadeOut => {
+            PopupOutAnimation::FadeOut { decay_rate } => {
                 let delta = time.delta_secs();
                 if let Some(mut mat) = materials.get_mut(handle.id()) {
                     let mut alpha = mat.base_color.alpha();
@@ -247,10 +276,52 @@ fn handle_closing(
                         commands.entity(id).despawn();
                     }
 
-                    alpha.smooth_nudge(&0.0, 1., delta);
+                    alpha.smooth_nudge(&0.0, decay_rate, delta);
                     mat.base_color.set_alpha(alpha);
                 }
             }
         }
     }
+}
+
+#[derive(EntityEvent)]
+struct PlaceAtScreenPos {
+    entity: Entity,
+    screen: u32,
+    relative_center: Vec2,
+    mode: FullScreenMode,
+}
+
+enum FullScreenMode {
+    One,
+    All,
+}
+
+fn place_at_sceen_pos(
+    trigger: On<PlaceAtScreenPos>,
+    mut objects: Query<&mut Transform>,
+    screens: Query<&ScreenPosition>,
+) -> Result<(), BevyError> {
+    let screen_ids = screens.iter().collect::<Vec<_>>();
+    dbg!(screen_ids);
+
+    let screen = screens
+        .iter()
+        .find(|s| s.index == trigger.screen)
+        // Fall back to main screen
+        .unwrap_or_else(|| screens.iter().min_by_key(|s| s.index).unwrap());
+
+    let mut object = objects.get_mut(trigger.entity)?;
+
+    let scale = match trigger.mode {
+        FullScreenMode::One => todo!(),
+        FullScreenMode::All => object.scale.normalize().xy() * 1000.0,
+    };
+
+    let center = screen.rect.center() + trigger.relative_center * screen.rect.size();
+
+    object.translation = center.extend(0.0);
+    object.scale = scale.extend(0.0);
+
+    Ok(())
 }

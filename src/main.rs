@@ -1,16 +1,36 @@
 use std::time::Duration;
 
+use bevy::math::{Vec2, VectorSpace};
 use rand::seq::SliceRandom;
 use wayland_overlay_media_viewer::{
     position::PopupPosition,
     spawner::{
-        ObjectCloseCondition, ObjectMessage, ObjectType, PopupImage, PopupInAnimation,
-        PopupInteraction, PopupOutAnimation, PopupVideo,
+        CustomShaderSource, ObjectCloseCondition, ObjectMessage, ObjectType, PopupImage,
+        PopupInAnimation, PopupInteraction, PopupOutAnimation, PopupVideo,
     },
 };
 
 fn main() {
     let sender = wayland_overlay_media_viewer::startup();
+
+    sender.send(ObjectMessage {
+        kind: ObjectType::Shader(CustomShaderSource {
+            code: MY_WGSL_STRING.to_owned(),
+            duraton: 10.0,
+        }),
+        position: PopupPosition::FullScreeAll {
+            screen: 1,
+            relative_center: Vec2::ZERO,
+        },
+        popup_animation: PopupInAnimation::None,
+        behaviour: PopupInteraction::ClickThough,
+        opacity: 0.5,
+        close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+        close_condition: ObjectCloseCondition {
+            duration: None,
+            click: None,
+        },
+    });
 
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
@@ -31,9 +51,9 @@ fn main() {
                         popup_animation: PopupInAnimation::SlideFadeIn,
                         behaviour: PopupInteraction::Clickable,
                         opacity: 0.9,
-                        close_animation: PopupOutAnimation::FadeOut,
+                        close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
                         close_condition: ObjectCloseCondition {
-                            duration: Some(Duration::from_secs_f64(20.0)),
+                            duration: None,
                             click: None,
                         },
                     });
@@ -48,9 +68,9 @@ fn main() {
             popup_animation: PopupInAnimation::SlideFadeIn,
             behaviour: PopupInteraction::Clickable,
             opacity: 0.9,
-            close_animation: PopupOutAnimation::FadeOut,
+            close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
             close_condition: ObjectCloseCondition {
-                duration: Some(Duration::from_secs(1000)),
+                duration: None,
                 click: None,
             },
         });
@@ -64,3 +84,37 @@ fn to_type(string: String) -> ObjectType {
         ObjectType::Image(PopupImage { uri: string })
     }
 }
+
+const MY_WGSL_STRING: &str = r#"
+// Remap UV from [0, 1] to [-0.5, 0.5] to center the origin
+let uv_centered = (in.uv - vec2<f32>(0.5, 0.5)) * p_scale;
+
+// Calculate distance from the center
+let radius = length(uv_centered);
+
+// Calculate angle in radians (-PI to PI)
+let angle = atan2(uv_centered.y, uv_centered.x);
+
+
+let speed = 3.0;
+let tightness = 3.0;
+let arms =  5.0;
+
+let spiral_factor = - angle * arms +  pow(radius, 0.9) * tightness + p_progress * speed;
+        
+// Use sine to create an oscillating value between -1.0 and 1.0
+let wave = sin(spiral_factor);
+
+// Manual Anti-Aliasing using screen-space derivatives (fwidth)
+// This calculates exactly how fast the wave changes between neighboring pixels
+let delta = fwidth(wave);
+
+// Smoothstep creates a razor-sharp edge with a 1.5-pixel blending zone
+// to prevent aliasing (jagged edges) without causing blurriness
+let mask = smoothstep(-delta * 1.5, delta * 1.5, wave);
+
+// Mix between solid black (0.0) and solid white (1.0)
+let color = vec3<f32>(mask);
+
+return vec4<f32>(color, p_opacity); 
+"#;

@@ -2,10 +2,13 @@ use std::io::ErrorKind;
 use std::{collections::HashSet, f32::consts::FRAC_PI_4};
 
 use bevy::asset::uuid::Uuid;
+use bevy::camera::visibility::NoFrustumCulling;
 use bevy::light::cluster::ClusterConfig;
 use bevy::math::{I64Vec2, U64Vec2};
 use bevy::picking::PickingSystems;
-use bevy::picking::pointer::{Location, PointerAction, PointerId, PointerInput, PointerLocation, update_pointer_map};
+use bevy::picking::pointer::{
+    Location, PointerAction, PointerId, PointerInput, PointerLocation, update_pointer_map,
+};
 use bevy::render::view::NoIndirectDrawing;
 use bevy::{
     camera::{ImageRenderTarget, RenderTarget},
@@ -81,12 +84,10 @@ impl Plugin for WaylandBackendPlugin {
                 ExtractComponentPlugin::<WaylandRenderTarget>::default(),
             ))
             .add_systems(PostUpdate, wayland_event_system)
-.            add_systems(First, pointer_input_system.in_set(PickingSystems::Input))
+            .add_systems(First, pointer_input_system.in_set(PickingSystems::Input))
             .insert_non_send(WaylandEventQueue(event_queue))
             .insert_non_send(app_state)
             .add_plugins(LayerShellInputPlugin);
-
-        
     }
 }
 
@@ -133,7 +134,11 @@ pub fn wayland_event_system(
             );
             surface_descriptor.upsert_surface(
                 surface_config,
-                spawn_camera(&mut commands, &mut images, surface_config),
+                spawn_camera(
+                    &mut commands,
+                    &mut images,
+                    surface_config,
+                ),
             );
             touched = true;
         }
@@ -143,11 +148,9 @@ pub fn wayland_event_system(
             touched = true;
 
             for desc in &surface_descriptor.surfaces {
-                let Ok((_, mut transform, mut position)) = cameras.get_mut(desc.camera) else {
-                    continue;
-                };
-
-                (*transform, *position) = create_transform(desc);
+                commands
+                    .entity(desc.camera)
+                    .insert(create_transform(desc, &app_state.output_order));
             }
         }
 
@@ -163,7 +166,6 @@ pub fn wayland_event_system(
     }
 }
 
-
 pub fn pointer_input_system(
     mut app_state: NonSendMut<WaylandAppState>,
     mut pointer_state: ResMut<WallpaperPointerState>,
@@ -171,8 +173,6 @@ pub fn pointer_input_system(
     mut pointer_writer: MessageWriter<PointerInput>,
 ) {
     if app_state.is_running() {
-
-
         let had_pointer_events = !app_state.pending_pointer_events.is_empty();
         apply_pointer_events(
             &mut pointer_state,
@@ -188,8 +188,10 @@ pub fn pointer_input_system(
     }
 }
 
-
-fn create_transform(entry: &SurfaceDescriptorEntry) -> (Transform, ScreenPosition) {
+fn create_transform(
+    entry: &SurfaceDescriptorEntry,
+    screen_order: &[u32],
+) -> (Transform, ScreenPosition) {
     let w_target = entry.width as f32 / PIXELS_PER_METER;
     let h_target = entry.height as f32 / PIXELS_PER_METER;
 
@@ -207,6 +209,10 @@ fn create_transform(entry: &SurfaceDescriptorEntry) -> (Transform, ScreenPositio
             pixel_min: I64Vec2::new(entry.offset_x as i64, entry.offset_y as i64),
             pixel_size: U64Vec2::new(entry.width as u64, entry.height as u64),
             output: entry.output,
+            index: screen_order
+                .iter()
+                .position(|id| entry.output == *id)
+                .unwrap() as u32,
         },
     )
 }
@@ -218,41 +224,28 @@ fn spawn_camera(
 ) -> Entity {
     let image = create_wayland_image(images, config.width, config.height);
 
-    let w_target = config.width as f32 / PIXELS_PER_METER;
-    let h_target = config.height as f32 / PIXELS_PER_METER;
-
-    let center_x = config.offset_x as f32 / PIXELS_PER_METER + (w_target / 2.0);
-    let center_y = config.offset_y as f32 / PIXELS_PER_METER + (h_target / 2.0);
-
-    let transform = Transform::from_translation(Vec3::new(center_x, center_y, 10.0))
-        .looking_at(Vec3::new(center_x, center_y, 0.0), Vec3::Y);
-
     commands
         .spawn((
             WaylandRenderTarget::new(image.clone()),
             Camera3d::default(),
-            transform,
             Projection::Orthographic(OrthographicProjection {
                 scale: 1.0 / PIXELS_PER_METER,
                 ..OrthographicProjection::default_3d()
             }),
-            ScreenPosition {
-                rect: Rect::from_center_size(
-                    Vec2::new(center_x, center_y),
-                    Vec2::new(w_target, h_target),
-                ),
-                pixel_min: I64Vec2::new(config.offset_x as i64, config.offset_y as i64),
-                pixel_size: U64Vec2::new(config.width as u64, config.height as u64),
-                output: config.output,
-            },
             RenderTarget::Image(ImageRenderTarget {
                 handle: image,
                 scale_factor: 1.0,
             }),
             RequestInputRecalc::default(),
+            // No lights: No clusters
             ClusterConfig::Single,
+            // No batchable meshes
             NoIndirectDrawing,
-            MeshPickingCamera
+            // We can pick
+            MeshPickingCamera,
+            // Don't need frustum culling, meshes are simple
+            // and always on at least one screen
+            NoFrustumCulling,
         ))
         .id()
 }
@@ -333,10 +326,10 @@ fn apply_pointer_events(
             ..state.last.clone().unwrap_or_default()
         };
 
-        let Some((target,pos)) = cameras
+        let Some((target, pos)) = cameras
             .iter()
             .find(|(_, _, p)| p.output == evt.output)
-            .map(|(t, _, pos)| (t.image.clone(),pos))
+            .map(|(t, _, pos)| (t.image.clone(), pos))
         else {
             continue;
         };
@@ -356,7 +349,7 @@ fn apply_pointer_events(
         };
         if new_position != prev_position {
             write(PointerAction::Move {
-                delta: (new_position - prev_position) ,
+                delta: (new_position - prev_position),
             });
         }
 

@@ -9,6 +9,7 @@ pub mod images;
 pub mod interaction;
 pub mod lifecycle;
 pub mod position;
+pub mod shader;
 pub mod spawner;
 pub mod videos;
 
@@ -20,19 +21,16 @@ use bevy::{
     asset::{io::web::WebAssetPlugin, AssetPlugin},
     camera::ClearColor,
     color::Color,
-    dev_tools::picking_debug::{DebugPickingMode, PointerDebug},
+    dev_tools::picking_debug::DebugPickingMode,
     ecs::{
-        message::MessageWriter,
-        resource::Resource,
-        schedule::IntoScheduleConfigs,
-        system::{Commands, ResMut},
+        message::MessageWriter, resource::Resource, schedule::IntoScheduleConfigs, system::ResMut,
     },
     image::ImagePlugin,
     pbr::PbrPlugin,
-    picking::{mesh_picking::MeshPickingPlugin, PickingPlugin, PickingSettings},
+    picking::PickingSettings,
     prelude::*,
     render::pipelined_rendering::PipelinedRenderingPlugin,
-    window::{PrimaryWindow, WindowPlugin},
+    window::WindowPlugin,
     winit::WinitPlugin,
     DefaultPlugins,
 };
@@ -45,6 +43,8 @@ use crate::{
     draw_order::CustomDrawOrderPlugin,
     interaction::PopupInteractionPlugin,
     lifecycle::LiveCyclePlugin,
+    position::ScreenPosition,
+    shader::DynamicShaderPlugin,
     spawner::{preload_asset, ObjectMessage, PopupPlugin},
     videos::plugin::VideoPlugin,
 };
@@ -105,7 +105,7 @@ fn startup_inner(rx: DataReceiver) {
             .set(PbrPlugin {
                 add_default_deferred_lighting_plugin: false,
                 prepass_enabled: false,
-                use_gpu_instance_buffer_builder: true,
+                use_gpu_instance_buffer_builder: false,
                 ..Default::default()
             }),
         PopupPlugin,
@@ -115,6 +115,7 @@ fn startup_inner(rx: DataReceiver) {
         AnimatedImagePlugin,
         CustomDrawOrderPlugin,
         PopupInteractionPlugin,
+        DynamicShaderPlugin,
         EntropyPlugin::<WyRand>::default(),
     ));
 
@@ -141,35 +142,18 @@ fn startup_inner(rx: DataReceiver) {
         .run();
 }
 
-fn setup(
-    mut framepace: ResMut<FramepaceSettings>,
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn setup(mut framepace: ResMut<FramepaceSettings>) {
     framepace.limiter = bevy_framepace::Limiter::Manual(Duration::from_secs_f64(1.0 / 60.));
-
-    // commands.spawn((
-    //     // 1. Definiere die Geometrie (Würfel mit Kantenlänge 2.0)
-    //     Mesh3d(meshes.add(Cuboid::new(5.0, 5.0, 5.0))),
-    //     // 2. Erstelle ein leicht transparentes Material (Blend-Mode)
-    //     MeshMaterial3d(materials.add(StandardMaterial {
-    //         base_color: Color::Srgba(Srgba::new(0.0, 0.8, 1.0, 1.0)), // Cyan-Blau mit Alpha 0.6
-    //         alpha_mode: AlphaMode::Opaque,
-    //         ..default()
-    //     })),
-    //     // 3. Setze die exakte Position im 3D-Raum
-    //     Transform::from_xyz(5.0, 10.0, -20.0).with_scale(Vec3::ONE * 5.),
-    //     // 4. Deine eigene Marker-Komponente für das Wayland-Input-System
-    //     Clickable,
-    //     // // 5. DIE WICHTIGSTE KOMPONENTE für das Bevy 0.19 Picking-Backend
-    //     Pickable::default(),
-    //     // // 6. Layer-Zuweisung (Muss mit deiner Kamera übereinstimmen)
-    //     // render_layer,
-    // ));
 }
 
-fn forward_messages(mut writer: MessageWriter<ObjectMessage>, new_objs: ResMut<DataReceiver>) {
+fn forward_messages(
+    mut writer: MessageWriter<ObjectMessage>,
+    new_objs: ResMut<DataReceiver>,
+    screens: Query<&ScreenPosition>,
+) {
+    if screens.is_empty() {
+        return;
+    }
     while let Ok(msg) = new_objs.new_objcets.try_recv() {
         writer.write(msg);
     }
