@@ -10,8 +10,8 @@ use crate::{
 };
 use crate::{
     lifecycle,
-    position::{PIXELS_PER_METER, PopupPosition},
-    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
+    position::{PopupPosition, PIXELS_PER_METER},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 

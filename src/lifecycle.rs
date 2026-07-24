@@ -9,10 +9,10 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    Clickable,
     draw_order::DrawOrder,
-    position::{PIXELS_PER_METER, PopupPosition, ScreenPosition},
+    position::{PopupPosition, ScreenPosition, PIXELS_PER_METER},
     spawner::{ObjectMessage, PopupOutAnimation, TargetOpacity},
+    Clickable,
 };
 
 pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) {
@@ -48,7 +48,13 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: ObjectMessage) 
     match msg.behaviour {
         crate::spawner::PopupInteraction::ClickThough => {}
         crate::spawner::PopupInteraction::Clickable => {
-            commands.insert(Clickable);
+            commands.insert((
+                Clickable,
+                Pickable {
+                    is_hoverable: true,
+                    should_block_lower: true,
+                },
+            ));
         }
     }
 

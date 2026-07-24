@@ -1,9 +1,11 @@
 use std::io::ErrorKind;
 use std::{collections::HashSet, f32::consts::FRAC_PI_4};
 
+use bevy::asset::uuid::Uuid;
 use bevy::light::cluster::ClusterConfig;
 use bevy::math::{I64Vec2, U64Vec2};
-use bevy::picking::pointer::{Location, PointerAction, PointerInput};
+use bevy::picking::PickingSystems;
+use bevy::picking::pointer::{Location, PointerAction, PointerId, PointerInput, PointerLocation, update_pointer_map};
 use bevy::render::view::NoIndirectDrawing;
 use bevy::{
     camera::{ImageRenderTarget, RenderTarget},
@@ -79,9 +81,12 @@ impl Plugin for WaylandBackendPlugin {
                 ExtractComponentPlugin::<WaylandRenderTarget>::default(),
             ))
             .add_systems(PostUpdate, wayland_event_system)
+.            add_systems(First, pointer_input_system.in_set(PickingSystems::Input))
             .insert_non_send(WaylandEventQueue(event_queue))
             .insert_non_send(app_state)
             .add_plugins(LayerShellInputPlugin);
+
+        
     }
 }
 
@@ -94,11 +99,9 @@ pub fn wayland_event_system(
     mut app_state: NonSendMut<WaylandAppState>,
     mut surface_descriptor: ResMut<WaylandSurfaceDescriptor>,
     target_monitor: Res<WallpaperTargetMonitor>,
-    mut pointer_state: ResMut<WallpaperPointerState>,
     mut surface_info: ResMut<WallpaperSurfaceInfo>,
     mut cameras: Query<(&WaylandRenderTarget, &mut Transform, &mut ScreenPosition)>,
     mut images: ResMut<Assets<Image>>,
-    mut pointer_writer: MessageWriter<PointerInput>,
 ) {
     if app_state.is_running() {
         if let Err(err) = pump_wayland_events(&mut event_queue, &mut app_state) {
@@ -152,6 +155,24 @@ pub fn wayland_event_system(
             surface_descriptor.bump_generation();
         }
 
+        if let Some((min_x, min_y, w, h)) =
+            ready_bounds(&surface_descriptor, &app_state, &target_monitor)
+        {
+            surface_info.set(min_x, min_y, w, h);
+        }
+    }
+}
+
+
+pub fn pointer_input_system(
+    mut app_state: NonSendMut<WaylandAppState>,
+    mut pointer_state: ResMut<WallpaperPointerState>,
+    mut cameras: Query<(&WaylandRenderTarget, &mut Transform, &mut ScreenPosition)>,
+    mut pointer_writer: MessageWriter<PointerInput>,
+) {
+    if app_state.is_running() {
+
+
         let had_pointer_events = !app_state.pending_pointer_events.is_empty();
         apply_pointer_events(
             &mut pointer_state,
@@ -164,14 +185,9 @@ pub fn wayland_event_system(
             sample.delta = Vec2::ZERO;
             sample.last_button = None;
         }
-
-        if let Some((min_x, min_y, w, h)) =
-            ready_bounds(&surface_descriptor, &app_state, &target_monitor)
-        {
-            surface_info.set(min_x, min_y, w, h);
-        }
     }
 }
+
 
 fn create_transform(entry: &SurfaceDescriptorEntry) -> (Transform, ScreenPosition) {
     let w_target = entry.width as f32 / PIXELS_PER_METER;
@@ -236,6 +252,7 @@ fn spawn_camera(
             RequestInputRecalc::default(),
             ClusterConfig::Single,
             NoIndirectDrawing,
+            MeshPickingCamera
         ))
         .id()
 }
@@ -316,10 +333,10 @@ fn apply_pointer_events(
             ..state.last.clone().unwrap_or_default()
         };
 
-        let Some(target) = cameras
+        let Some((target,pos)) = cameras
             .iter()
             .find(|(_, _, p)| p.output == evt.output)
-            .map(|(t, _, _)| t.image.clone())
+            .map(|(t, _, pos)| (t.image.clone(),pos))
         else {
             continue;
         };
@@ -328,7 +345,7 @@ fn apply_pointer_events(
             writer.write(PointerInput {
                 pointer_id: bevy::picking::pointer::PointerId::Mouse,
                 location: Location {
-                    position: new_position,
+                    position: new_position - pos.pixel_min.as_vec2(),
                     target: bevy::camera::NormalizedRenderTarget::Image(ImageRenderTarget {
                         handle: target.clone(),
                         scale_factor: 1.0,
@@ -339,14 +356,14 @@ fn apply_pointer_events(
         };
         if new_position != prev_position {
             write(PointerAction::Move {
-                delta: new_position - prev_position,
+                delta: (new_position - prev_position) ,
             });
         }
 
         sample.last_button = evt
             .kind
             .button_change()
-            .map(|(button, pressed)| crate::PointerButton { button, pressed });
+            .map(|(button, pressed)| crate::backend::PointerButton { button, pressed });
 
         if let Some(btn) = sample.last_button
             && let Some(button) = btn.button

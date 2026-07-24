@@ -1,10 +1,16 @@
-use bevy::{picking::pointer::PointerLocation, prelude::*};
+use bevy::{
+    picking::{
+        backend::{ray::RayMap, PointerHits},
+        pointer::{PointerInteraction, PointerLocation, PointerPress},
+    },
+    prelude::*,
+};
 
 pub struct PointerVisualizerPlugin;
 
 impl Plugin for PointerVisualizerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, draw_pointer_gizmos);
+        app.add_systems(Update, (draw_pointer_gizmos, log_internal_pointer_state));
     }
 }
 
@@ -57,5 +63,67 @@ fn draw_pointer_gizmos(
                 );
             }
         }
+    }
+}
+
+fn log_internal_pointer_state(
+    // Wir fragen das Entity selbst ab, um es im Log identifizieren zu können
+    pointer_query: Query<(
+        Entity,
+        &PointerLocation,
+        Option<&PointerPress>,
+        Option<&PointerInteraction>,
+    )>,
+
+    mut hits: MessageReader<PointerHits>,
+) {
+    for (entity, location, press_state, interaction) in &pointer_query {
+        let pos_str = match location.location() {
+            Some(pos) => format!("X: {:.1}, Y: {:.1}", pos.position.x, pos.position.y),
+            None => "No Position (Outside Window/Not Initialized)".to_string(),
+        };
+
+        let press_str = match press_state {
+            Some(press) => {
+                let mut pressed_buttons = Vec::new();
+
+                if press.is_primary_pressed() {
+                    pressed_buttons.push("Primary");
+                }
+                if press.is_secondary_pressed() {
+                    pressed_buttons.push("Secondary");
+                }
+                if press.is_middle_pressed() {
+                    pressed_buttons.push("Middle");
+                }
+                if pressed_buttons.is_empty() {
+                    "None".to_string()
+                } else {
+                    format!("Pressing: [{}]", pressed_buttons.join(", "))
+                }
+            }
+            None => "No PointerPress Component Attached".to_string(),
+        };
+
+        let interaction_str = match interaction {
+            Some(interact) => {
+                let hovered: Vec<String> = interact
+                    .iter()
+                    .map(|(entity, _info)| format!("{:?}", entity))
+                    .collect();
+                if hovered.is_empty() {
+                    "Hovering: Nothing".to_string()
+                } else {
+                    format!("Hovering Entities: [{}]", hovered.join(", "))
+                }
+            }
+            None => "No PointerInteraction Component Attached".to_string(),
+        };
+
+        info!(
+            target: "bevy_picking_debug",
+            "Pointer {:?} -> Position: [{}], State: {}, {}",
+            entity, pos_str, press_str, interaction_str
+        );
     }
 }
