@@ -1,11 +1,9 @@
 use bevy::{
-    material::descriptor::FragmentState,
     pbr::MaterialPlugin,
     prelude::*,
     reflect::TypePath,
-    render::{batching::NoAutomaticBatching, render_resource::AsBindGroup},
+    render::render_resource::AsBindGroup,
 };
-use wgpu::ColorTargetState;
 
 pub struct DynamicShaderPlugin;
 
@@ -106,9 +104,9 @@ impl Material for DynamicMaterial {
         AlphaMode::Blend
     }
     fn specialize(
-        pipeline: &bevy::pbr::MaterialPipeline,
+        _pipeline: &bevy::pbr::MaterialPipeline,
         descriptor: &mut bevy::material::descriptor::RenderPipelineDescriptor,
-        layout: &bevy::mesh::MeshVertexBufferLayoutRef,
+        _layout: &bevy::mesh::MeshVertexBufferLayoutRef,
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::material::specialize::SpecializedMeshPipelineError> {
         let b = key.bind_group_data;

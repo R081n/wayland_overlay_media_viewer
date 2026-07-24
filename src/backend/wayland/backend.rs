@@ -1,13 +1,12 @@
 use std::io::ErrorKind;
-use std::{collections::HashSet, f32::consts::FRAC_PI_4};
+use std::collections::HashSet;
 
-use bevy::asset::uuid::Uuid;
 use bevy::camera::visibility::NoFrustumCulling;
 use bevy::light::cluster::ClusterConfig;
 use bevy::math::{I64Vec2, U64Vec2};
 use bevy::picking::PickingSystems;
 use bevy::picking::pointer::{
-    Location, PointerAction, PointerId, PointerInput, PointerLocation, update_pointer_map,
+    Location, PointerAction, PointerInput,
 };
 use bevy::render::view::NoIndirectDrawing;
 use bevy::{
@@ -101,7 +100,7 @@ pub fn wayland_event_system(
     mut surface_descriptor: ResMut<WaylandSurfaceDescriptor>,
     target_monitor: Res<WallpaperTargetMonitor>,
     mut surface_info: ResMut<WallpaperSurfaceInfo>,
-    mut cameras: Query<(&WaylandRenderTarget, &mut Transform, &mut ScreenPosition)>,
+    _cameras: Query<(&WaylandRenderTarget, &mut Transform, &mut ScreenPosition)>,
     mut images: ResMut<Assets<Image>>,
 ) {
     if app_state.is_running() {

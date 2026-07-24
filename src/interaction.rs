@@ -14,7 +14,6 @@ use bevy::{
 use crate::{
     draw_order::DrawOrder,
     lifecycle::{get_new_topmost_id, CloseOnClick, Closing},
-    Clickable,
 };
 
 pub struct PopupInteractionPlugin;
@@ -125,7 +124,6 @@ fn on_right_dragging(
             let distance = (original_hit_point - ray.origin).dot(*camera_forward) / denominator;
             let current_ray_intersection = ray.origin + ray.direction * distance;
 
-            // 💡 APPLY THE OFFSET: Reconstruct the new object center relative to where the cursor is now
             transform.translation = current_ray_intersection + dragging.initial_offset;
         }
     }
@@ -139,12 +137,12 @@ fn on_right_drag_end(
 ) {
     let event = trigger.event();
 
-    if let Ok(dragging) = dragged_entities.get(trigger.entity) {
-        if event.pointer_id == dragging.pointer_id {
+    if let Ok(dragging) = dragged_entities.get(trigger.entity)
+        && event.pointer_id == dragging.pointer_id {
             commands.entity(trigger.entity).remove::<RightDragging>();
         }
-    }
 }
+
 
 fn on_left_click(
     trigger: On<Pointer<Click>>,
@@ -166,7 +164,7 @@ fn populate_ray_map_manually(
     // Fetch the mutable RayMap framework resource
     mut ray_map: ResMut<RayMap>,
 ) {
-    for (pointer_entity, pointer_location) in &pointer_query {
+    for (_pointer_entity, pointer_location) in &pointer_query {
         // Confirm the pointer carries active window coordinates
 
         let Some(location) = pointer_location.location() else {

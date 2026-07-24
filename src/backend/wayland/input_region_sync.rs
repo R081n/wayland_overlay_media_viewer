@@ -1,12 +1,5 @@
-use bevy::{camera::primitives::Aabb, prelude::*, window::RawHandleWrapper};
-use raw_window_handle::{RawWindowHandle, WaylandWindowHandle};
-use wayland_client::{
-    Proxy,
-    protocol::{
-        wl_compositor, wl_region,
-        wl_surface::{self, WlSurface},
-    },
-};
+use bevy::{camera::primitives::Aabb, prelude::*};
+use wayland_client::protocol::wl_surface::WlSurface;
 
 use crate::{
     backend::wayland::{

@@ -7,7 +7,6 @@ use std::{
 use crate::{
     animated_image::{Gif3d, GifAsset},
     lifecycle::handle_slide_fade_in,
-    position::ScreenPosition,
     shader::{DynamicMaterial, SHADER_TEMPLATE, ShaderRepeatPeriod},
 };
 use crate::{

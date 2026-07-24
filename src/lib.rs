@@ -11,15 +11,15 @@ pub mod lifecycle;
 pub mod position;
 pub mod shader;
 pub mod spawner;
+pub mod texts;
 pub mod videos;
 
 use std::time::Duration;
 
 pub use backend::*;
 use bevy::{
-    DefaultPlugins,
     app::{App, PluginGroup as _, PreUpdate, Startup, TerminalCtrlCHandlerPlugin, Update},
-    asset::{AssetPlugin, io::web::WebAssetPlugin},
+    asset::{io::web::WebAssetPlugin, AssetPlugin},
     camera::ClearColor,
     color::Color,
     dev_tools::picking_debug::DebugPickingMode,
@@ -33,6 +33,7 @@ use bevy::{
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::WindowPlugin,
     winit::WinitPlugin,
+    DefaultPlugins,
 };
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
@@ -45,7 +46,7 @@ use crate::{
     lifecycle::LiveCyclePlugin,
     position::ScreenPosition,
     shader::DynamicShaderPlugin,
-    spawner::{ObjectMessage, PopupPlugin, preload_asset},
+    spawner::{preload_asset, ObjectMessage, PopupPlugin},
     videos::plugin::VideoPlugin,
 };
 

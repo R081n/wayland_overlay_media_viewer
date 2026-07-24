@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use bevy::math::{Vec2, VectorSpace};
 use rand::seq::SliceRandom;
 use wayland_overlay_media_viewer::{
     position::PopupPosition,
@@ -13,24 +12,24 @@ use wayland_overlay_media_viewer::{
 fn main() {
     let sender = wayland_overlay_media_viewer::startup();
 
-    // sender.send(ObjectMessage {
-    //     kind: ObjectType::Shader(CustomShaderSource {
-    //         code: MY_WGSL_STRING.to_owned(),
-    //         duraton: 10.0,
-    //     }),
-    //     position: PopupPosition::FullScreeAll {
-    //         screen: 1,
-    //         relative_center: Vec2::ZERO,
-    //     },
-    //     popup_animation: PopupInAnimation::None,
-    //     behaviour: PopupInteraction::ClickThough,
-    //     opacity: 0.1,
-    //     close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
-    //     close_condition: ObjectCloseCondition {
-    //         duration: None,
-    //         click: None,
-    //     },
-    // });
+    sender.send(ObjectMessage {
+        kind: ObjectType::Shader(CustomShaderSource {
+            code: MY_WGSL_STRING.to_owned(),
+            duraton: 10.0,
+        }),
+        position: PopupPosition::FullScreeAll {
+            screen: 1,
+            relative_center: bevy::math::Vec2::ZERO,
+        },
+        popup_animation: PopupInAnimation::None,
+        behaviour: PopupInteraction::ClickThough,
+        opacity: 0.1,
+        close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+        close_condition: ObjectCloseCondition {
+            duration: None,
+            click: None,
+        },
+    });
 
     for line in std::io::stdin().lines() {
         let line = line.unwrap();
@@ -98,9 +97,9 @@ let angle = atan2(uv_centered.y, uv_centered.x);
 
 let speed = 3.0;
 let tightness = 3.0;
-let arms =  5.0;
+let arms =  1.0;
 
-let spiral_factor = - angle * arms +  pow(radius, 0.9) * tightness + p_progress * speed;
+let spiral_factor =  angle * arms + log2(radius) * tightness - p_progress * speed;
         
 // Use sine to create an oscillating value between -1.0 and 1.0
 let wave = sin(spiral_factor);

@@ -71,7 +71,7 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         });
     }
 
-    if let Some(_) = &close.click {
+    if close.click.is_some() {
         commands.insert(CloseOnClick);
     }
 
@@ -298,6 +298,7 @@ struct PlaceAtScreenPos {
 }
 
 enum FullScreenMode {
+    #[allow(dead_code)]
     One,
     All,
 }
