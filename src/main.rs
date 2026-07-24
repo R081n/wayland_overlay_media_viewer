@@ -112,14 +112,17 @@ let wave = sin(spiral_factor);
 
 // Manual Anti-Aliasing using screen-space derivatives (fwidth)
 // This calculates exactly how fast the wave changes between neighboring pixels
-let delta = fwidth(wave);
+let delta = fwidthFine(wave);
 
 // Smoothstep creates a razor-sharp edge with a 1.5-pixel blending zone
 // to prevent aliasing (jagged edges) without causing blurriness
 let mask = smoothstep(-delta * 1.5, delta * 1.5, wave);
 
-// Mix between solid black (0.0) and solid white (1.0)
-let color = vec3<f32>(mask);
+let center_fade = mix(0.5, mask, clamp(radius * 100 - 0.7, 0.0, 1.0));
 
-return vec4<f32>(color, p_opacity); 
+let final_mask = center_fade;
+
+let color = vec3<f32>(final_mask);
+
+return vec4<f32>(color, p_opacity * final_mask); 
 "#;

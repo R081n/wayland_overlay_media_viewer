@@ -22,6 +22,7 @@ use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_l
 
 use crate::RequestInputRecalc;
 use crate::backend::wayland::input_region_sync::LayerShellInputPlugin;
+use crate::backend::wayland::premultiply::WaylandPresentPlugin;
 use crate::position::{PIXELS_PER_METER, ScreenPosition};
 use crate::{
     PointerSample, WallpaperPointerState, WallpaperSurfaceInfo, WallpaperTargetMonitor,
@@ -86,7 +87,7 @@ impl Plugin for WaylandBackendPlugin {
             .add_systems(First, pointer_input_system.in_set(PickingSystems::Input))
             .insert_non_send(WaylandEventQueue(event_queue))
             .insert_non_send(app_state)
-            .add_plugins(LayerShellInputPlugin);
+            .add_plugins((LayerShellInputPlugin,WaylandPresentPlugin));
     }
 }
 

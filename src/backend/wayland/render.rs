@@ -16,8 +16,9 @@ use bevy::{
     },
 };
 use wgpu::{
-    CommandEncoderDescriptor, CompositeAlphaMode, CurrentSurfaceTexture, Origin3d, PresentMode,
-    SurfaceConfiguration, SurfaceTargetUnsafe, TextureAspect,
+    BindGroupEntry, BindingResource, CommandEncoderDescriptor, CompositeAlphaMode,
+    CurrentSurfaceTexture, Origin3d, PresentMode, SurfaceConfiguration, SurfaceTargetUnsafe,
+    TextureAspect,
 };
 
 use super::surface::WaylandSurfaceHandles;
@@ -257,6 +258,7 @@ pub(crate) fn present_wayland_surface(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     descriptor: Res<WaylandSurfaceDescriptor>,
+    pipeline: Res<super::premultiply::WaylandBlitPipeline>,
 ) {
     for (output, entry) in state.surfaces.iter_mut() {
         let Some(surface) = entry.surface.as_ref() else {
@@ -323,18 +325,58 @@ pub(crate) fn present_wayland_surface(
         let mut encoder = render_device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("wayland-surface-present"),
         });
+        // Create a view of your surface texture to serve as the render target
+        let surface_view = surface_texture
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let src = gpu_image.texture.as_image_copy();
+        let src_view = gpu_image
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let dst = wgpu::TexelCopyTextureInfo {
-            texture: &surface_texture.texture,
-            mip_level: 0,
-            origin: Origin3d::ZERO,
-            aspect: TextureAspect::All,
-        };
+        // Setup a render pass replacing the encoder.copy_texture_to_texture instruction
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("premultiply_blit_pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &surface_view,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
 
-        encoder.copy_texture_to_texture(src, dst, extent);
+            let source_texture_bind_group = render_device.create_bind_group(
+                "premultiply_blit_bind_group",
+                &pipeline.bind_group_layout,
+                &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: BindingResource::TextureView(&src_view),
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: BindingResource::Sampler(&pipeline.sampler), // Use the sampler from Step 2
+                    },
+                ],
+            );
 
+            // Configure your blit pipeline context
+            render_pass.set_pipeline(&pipeline.pipeline);
+            render_pass.set_bind_group(0, Some(&*source_texture_bind_group), &[]);
+
+            // Draw 3 vertices to execute the full-screen blit shader
+            render_pass.draw(0..3, 0..1);
+        }
+
+        // Submit and present normally
         render_queue.submit(Some(encoder.finish()));
         surface_texture.present();
     }

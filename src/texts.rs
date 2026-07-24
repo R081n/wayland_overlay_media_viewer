@@ -6,6 +6,7 @@ use bevy::color::palettes::basic::{BLACK, GREEN};
 use bevy::color::ColorCurve;
 use bevy::math::ops::{cos, sin};
 use bevy::prelude::*;
+use bevy::render::batching::NoAutomaticBatching;
 use bevy::transform::plugins::TransformSystems;
 use bevy::ui::UiSystems;
 
@@ -26,25 +27,22 @@ struct HealthBar {
     color_curve: ColorCurve<LinearRgba>,
 }
 
-struct TextOverlayPlugin;
+pub struct TextOverlayPlugin;
 
-impl Plugin for 
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_systems(Startup, setup)
-        .add_systems(Update, (move_cube, update_health).chain())
-        .add_systems(
-            // Bevy's UI Layout happens before transform propagation,
-            // so we will have to run update_health_bar before both
-            // and do the transform propagation manually.
-            PostUpdate,
-            update_health_bar
-                .before(TransformSystems::Propagate)
-                .before(UiSystems::Layout),
-        )
-        .run();
+impl Plugin for TextOverlayPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Startup, setup)
+            .add_systems(Update, (move_cube, update_health).chain())
+            .add_systems(
+                // Bevy's UI Layout happens before transform propagation,
+                // so we will have to run update_health_bar before both
+                // and do the transform propagation manually.
+                PostUpdate,
+                update_health_bar
+                    .before(TransformSystems::Propagate)
+                    .before(UiSystems::Layout),
+            );
+    }
 }
 
 /// set up a 3D scene where the cube will have a health bar
@@ -53,32 +51,14 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // circular base
-    commands.spawn((
-        Mesh3d(meshes.add(Circle::new(4.0))),
-        MeshMaterial3d(materials.add(Color::WHITE)),
-        Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-    ));
-    // light
-    commands.spawn((
-        PointLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(4.0, 8.0, 4.0),
-    ));
-    // camera
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(6.5, 2.5, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
     // cube with a health component
     let cube_id = commands
         .spawn((
             Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-            Transform::from_xyz(0.0, 0.5, 0.0),
+            Transform::from_xyz(10.0, 10.5, 0.0),
             Health(42.0),
+            NoAutomaticBatching,
         ))
         .id();
     // Root component for the health bar, this one will be moved to follow the cube
@@ -94,9 +74,10 @@ fn setup(
             Node::default(),
             Text::new("42"),
             TextFont {
-                font_size: 14.0,
+                font_size: FontSize::Px(10.),
                 ..default()
             },
+            NoAutomaticBatching,
             TextShadow {
                 offset: Vec2::splat(2.0),
                 color: BLACK.into(),
@@ -112,6 +93,7 @@ fn setup(
                 ..default()
             },
             BackgroundColor(BLACK.into()),
+            NoAutomaticBatching,
         ))
         .id();
 
@@ -140,6 +122,7 @@ fn setup(
                 color_curve: ColorCurve::new(colors).unwrap(),
             },
             BackgroundColor(Color::from(GREEN)),
+            NoAutomaticBatching,
         ))
         .id();
 
@@ -166,16 +149,13 @@ fn update_health_bar(
     target_query: Query<(Entity, &Health)>,
     camera_query: Single<(Entity, &Camera)>,
     transform_helper: TransformHelper,
-) {
+) -> Result<(), BevyError> {
     let camera_entity = camera_query.0;
     let camera = camera_query.1;
 
     // Since the global transform is not propagated at this point (see system ordering comment),
     // we will calculate the global transform manually:
-    let Ok(camera_transform) = transform_helper.compute_global_transform(camera_entity) else {
-        warn!("Failed computing global transform for camera Entity");
-        return;
-    };
+    let camera_transform = transform_helper.compute_global_transform(camera_entity)?;
 
     for (mut health_bar_node, health_bar_component, mut bg_color) in health_bar_query.iter_mut() {
         let root_entity = health_bar_component.root_ui_entity;
@@ -185,15 +165,11 @@ fn update_health_bar(
             .unwrap();
         let (target, target_health) = target_query.get(health_bar_component.target).unwrap();
 
-        let Ok(target_world_transform) = transform_helper.compute_global_transform(target) else {
-            warn!("Failed computing global transform for target Entity");
-            return;
-        };
+        let target_world_transform = transform_helper.compute_global_transform(target)?;
         let target_world_position = target_world_transform.translation();
 
-        let target_viewport_position = camera
-            .world_to_viewport(&camera_transform, target_world_position)
-            .unwrap();
+        let target_viewport_position =
+            camera.world_to_viewport(&camera_transform, target_world_position)?;
 
         root_node.left = Val::Px(target_viewport_position.x - HALF_BAR_WIDTH);
         root_node.top = Val::Px(target_viewport_position.y - HALF_BAR_HEIGHT);
@@ -207,13 +183,15 @@ fn update_health_bar(
         let t = hp * 4.0 / (100.0); // 4 is the number of colors, 100 is the max health
         bg_color.0 = color_curve.sample_clamped(t).into();
     }
+
+    Ok(())
 }
 
 // Some placeholder movement so that we can see that the
 // health bar is correctly following the cube around
 fn move_cube(time: Res<Time>, mut movables: Query<&mut Transform, With<Health>>) {
     for mut transform in movables.iter_mut() {
-        transform.translation.x = sin(time.elapsed_secs()) * 2.0;
+        transform.translation.x = sin(time.elapsed_secs()) * 2.0 + 20.0;
         transform.translation.z = cos(time.elapsed_secs()) * 2.0;
     }
 }

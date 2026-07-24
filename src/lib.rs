@@ -11,7 +11,7 @@ pub mod lifecycle;
 pub mod position;
 pub mod shader;
 pub mod spawner;
-//pub mod texts;
+pub mod texts;
 pub mod videos;
 
 use std::time::Duration;
@@ -24,7 +24,8 @@ use bevy::{
     color::Color,
     dev_tools::picking_debug::DebugPickingMode,
     ecs::{
-        message::MessageWriter, resource::Resource, schedule::IntoScheduleConfigs, system::ResMut,
+        error::ErrorContext, message::MessageWriter, resource::Resource,
+        schedule::IntoScheduleConfigs, system::ResMut,
     },
     image::ImagePlugin,
     pbr::PbrPlugin,
@@ -47,6 +48,7 @@ use crate::{
     position::ScreenPosition,
     shader::DynamicShaderPlugin,
     spawner::{preload_asset, ObjectMessage, PopupPlugin},
+    texts::TextOverlayPlugin,
     videos::plugin::VideoPlugin,
 };
 
@@ -117,6 +119,7 @@ fn startup_inner(rx: DataReceiver) {
         CustomDrawOrderPlugin,
         PopupInteractionPlugin,
         DynamicShaderPlugin,
+        TextOverlayPlugin,
         EntropyPlugin::<WyRand>::default(),
     ));
 
@@ -137,10 +140,18 @@ fn startup_inner(rx: DataReceiver) {
     app.add_plugins(WindowOverlayPlugin {
         target_monitor: WallpaperTargetMonitor::All,
     });
-
+    app.set_error_handler(my_error_handler);
     app.add_systems(Startup, setup)
         .add_systems(PreUpdate, forward_messages.before(preload_asset))
         .run();
+}
+
+fn my_error_handler(error: BevyError, ctx: ErrorContext) {
+    if ctx.name().ends_with("plz_ignore") {
+        trace!("Nothing to see here, move along.");
+        return;
+    }
+    bevy::ecs::error::error(error, ctx);
 }
 
 fn setup(mut framepace: ResMut<FramepaceSettings>) {
