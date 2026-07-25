@@ -177,7 +177,7 @@ fn main() {
                 kind: to_type(link.to_owned()),
                 position: PopupPosition::Random,
                 popup_animation: PopupInAnimation::SlideFadeIn,
-                behaviour: PopupInteraction::Clickable,
+                behaviour: PopupInteraction::Draggable,
                 opacity: 0.9,
                 layer: PopupLayer::Normal,
                 close_animation: PopupOutAnimation::FadeOut { decay_rate: 5.0 },

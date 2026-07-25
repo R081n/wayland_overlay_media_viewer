@@ -11,14 +11,14 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    Clickable, RequestInputRecalc,
     draw_order::DrawOrder,
     position::{
-        FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition, ScreenspacePosition,
+        FullScreenMode, PopupPosition, ScreenPosition, ScreenspacePosition, PIXELS_PER_METER,
     },
     spawner::{
         ObjectMessage, PopupLayer, PopupOutAnimation, PopupSize, ProxyOpacity, TargetOpacity,
     },
+    Clickable, RequestInputRecalc,
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);
@@ -377,6 +377,10 @@ fn handle_closing(
     mut input_recalc: ResMut<RequestInputRecalc>,
 ) {
     for (id, handle, animation, clickable, mut proxy_opacity) in closing.iter_mut() {
+        if clickable {
+            commands.entity(id).remove::<Clickable>();
+        }
+
         match *animation {
             PopupOutAnimation::None => {
                 commands.entity(id).despawn();
@@ -388,13 +392,6 @@ fn handle_closing(
                 if proxy_opacity.0 < 0.000001 {
                     commands.entity(id).despawn();
                     input_recalc.request();
-                }
-
-                if clickable && proxy_opacity.0 < 0.1 {
-                    commands.entity(id).remove::<Clickable>().insert(Pickable {
-                        is_hoverable: false,
-                        should_block_lower: false,
-                    });
                 }
 
                 proxy_opacity.0.smooth_nudge(&0.0, decay_rate, delta);
