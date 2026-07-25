@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-
-# TODO remove unneded features
-
 clap = { version = "4.5", features = ["derive"] }
 
 raw-window-handle = "0.6.2"
@@ -21,6 +18,7 @@ wayland-protocols-wlr = { version = "0.3.8", features = ["client"] }
 #videos
 ffmpeg-next = "8.0"
 cpal = "0.15"
+
 image = "0.25"
 ringbuf = "0.4"
 bevy_framepace = "0.22.0"
