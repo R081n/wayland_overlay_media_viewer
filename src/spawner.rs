@@ -80,7 +80,7 @@ pub enum ObjectType {
 pub enum PopupInteraction {
     ClickThrough,
     Clickable,
-    /// Also implies movable
+    /// Also implies clickable
     Draggable,
 }
 
