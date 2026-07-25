@@ -11,14 +11,14 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    Clickable, RequestInputRecalc,
     draw_order::DrawOrder,
     position::{
-        FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition, ScreenspacePosition,
+        FullScreenMode, PopupPosition, ScreenPosition, ScreenspacePosition, PIXELS_PER_METER,
     },
     spawner::{
         ObjectMessage, PopupLayer, PopupOutAnimation, PopupSize, ProxyOpacity, TargetOpacity,
     },
+    Clickable, RequestInputRecalc,
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);
@@ -77,7 +77,7 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
             relative_center,
             mode,
         } => {
-            commands.trigger(|entity| PlaceAtScreenPos {
+            commands.trigger(|entity| PlaceAtFullScreenScreenPos {
                 entity,
                 screen,
                 relative_center,
@@ -404,7 +404,7 @@ fn handle_closing(
 }
 
 #[derive(EntityEvent)]
-struct PlaceAtScreenPos {
+struct PlaceAtFullScreenScreenPos {
     entity: Entity,
     screen: u32,
     relative_center: Vec2,
@@ -412,7 +412,7 @@ struct PlaceAtScreenPos {
 }
 
 fn place_at_sceen_pos(
-    trigger: On<PlaceAtScreenPos>,
+    trigger: On<PlaceAtFullScreenScreenPos>,
     mut objects: Query<&mut Transform>,
     screens: Query<&ScreenPosition>,
     mut input_recalc: ResMut<RequestInputRecalc>,
@@ -423,14 +423,37 @@ fn place_at_sceen_pos(
         // Fall back to main screen
         .unwrap_or_else(|| screens.iter().min_by_key(|s| s.index).unwrap());
 
+    let target_rect = match trigger.mode {
+        FullScreenMode::One => screen.rect,
+        FullScreenMode::All => screens
+            .iter()
+            .map(|s| s.rect)
+            .reduce(|a, b| a.union(b))
+            .ok_or("No screens")?,
+    };
+    let center = screen.rect.center() + trigger.relative_center * screen.rect.size() * 0.5;
+
+    let x_distance = [target_rect.min.x, target_rect.max.x]
+        .iter()
+        .map(|t| (center.x - t).abs())
+        .max_by(f32::total_cmp)
+        .unwrap_or(100.0);
+
+    let y_distance = [target_rect.min.y, target_rect.max.y]
+        .iter()
+        .map(|t| (center.x - t).abs())
+        .max_by(f32::total_cmp)
+        .unwrap_or(100.0);
+
     let mut object = objects.get_mut(trigger.entity)?;
 
     let scale = match trigger.mode {
         FullScreenMode::One => scale_to_fit(object.scale.xy(), screen.rect.size()),
-        FullScreenMode::All => object.scale.normalize().xy() * 1000.0,
+        FullScreenMode::All => scale_to_fit_but_the_other_way(
+            object.scale.xy(),
+            Vec2::new(x_distance, y_distance) * 2.0,
+        ),
     };
-
-    let center = screen.rect.center() + trigger.relative_center * screen.rect.size() * 0.5;
 
     object.translation = center.extend(-1.0);
     object.scale = scale.extend(1.0);
