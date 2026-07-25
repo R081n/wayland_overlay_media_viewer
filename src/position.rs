@@ -9,8 +9,9 @@ pub enum PopupPosition {
     SceenSpace(ScreenspacePosition),
     FullScreen {
         screen: u32,
-        // Relative to the center
-        // screen is normalized to [-1, 1],
+        /// Relative to the center
+        ///
+        /// screen is normalized to [-1, 1],
         relative_center: Vec2,
         mode: FullScreenMode,
     },
