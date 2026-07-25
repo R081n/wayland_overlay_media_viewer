@@ -34,18 +34,15 @@ rand = "0.10.2"
 version = "0.19"
 default-features = false
 features = [
-    "dev",
-
     "http",
     "https",
     "jpeg",
     "png",
     "webp",
     "gif",
+    "bmp",
 
     # all the collections that we need
-    "audio",
-    "audio-all-formats",
     "picking",
     "default_app",
     "common_api",
@@ -56,11 +53,9 @@ features = [
 
     #default_platform without winit
     "std",
-    "bevy_gilrs",
     "default_font",
     "multi_threaded",
     "wayland",
-    "sysinfo_plugin",
 ]
 
 [profile.dev]

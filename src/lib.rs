@@ -17,12 +17,10 @@ use std::time::Duration;
 
 pub use backend::*;
 use bevy::{
-    DefaultPlugins,
     app::{App, PluginGroup as _, PreUpdate, Startup, TerminalCtrlCHandlerPlugin, Update},
-    asset::{AssetPlugin, io::web::WebAssetPlugin},
+    asset::{io::web::WebAssetPlugin, AssetPlugin},
     camera::ClearColor,
     color::Color,
-    dev_tools::picking_debug::DebugPickingMode,
     ecs::{
         error::ErrorContext, message::MessageWriter, resource::Resource,
         schedule::IntoScheduleConfigs, system::ResMut,
@@ -34,6 +32,7 @@ use bevy::{
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::WindowPlugin,
     winit::WinitPlugin,
+    DefaultPlugins,
 };
 use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
@@ -46,7 +45,7 @@ use crate::{
     lifecycle::LiveCyclePlugin,
     position::ScreenPosition,
     shader::DynamicShaderPlugin,
-    spawner::{ObjectMessage, PopupPlugin, preload_asset},
+    spawner::{preload_asset, ObjectMessage, PopupPlugin},
     texts::TextOverlayPlugin,
     videos::plugin::VideoPlugin,
 };
@@ -137,8 +136,6 @@ fn startup_inner(rx: DataReceiver) {
         require_markers: true,
         ray_cast_visibility: RayCastVisibility::Any,
     });
-
-    app.insert_resource(DebugPickingMode::Noisy);
 
     app.add_plugins(WindowOverlayPlugin {
         target_monitor: WallpaperTargetMonitor::All,
