@@ -379,6 +379,7 @@ fn handle_closing(
     for (id, handle, animation, clickable, mut proxy_opacity) in closing.iter_mut() {
         if clickable {
             commands.entity(id).remove::<Clickable>();
+            input_recalc.request();
         }
 
         match *animation {
