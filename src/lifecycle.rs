@@ -441,7 +441,7 @@ fn place_at_sceen_pos(
 
     let y_distance = [target_rect.min.y, target_rect.max.y]
         .iter()
-        .map(|t| (center.x - t).abs())
+        .map(|t| (center.y - t).abs())
         .max_by(f32::total_cmp)
         .unwrap_or(100.0);
 
