@@ -1,16 +1,10 @@
-//! A simple UI health bar which follows an object around in 3D space.
-//! Using UI nodes is just one way to do this. Alternatively, you can use
-//! a mesh facing the camera to set up your health bar.
-
 use std::ops::Div;
 
-use bevy::color::palettes::basic::{BLACK, GREEN};
-use bevy::math::ops::{cos, sin};
 use bevy::prelude::*;
 
-use crate::position::PIXELS_PER_METER;
-use crate::spawner::{ProxyOpacity, TargetOpacity, TextPopup};
 use crate::RequestInputRecalc;
+use crate::position::PIXELS_PER_METER;
+use crate::spawner::{ProxyOpacity, TextPopup};
 
 pub struct TextOverlayPlugin;
 
@@ -32,11 +26,11 @@ pub struct TextAnchor(Vec<Entity>);
 fn create_new_texts(
     trigger: On<Insert, TextPopup>,
     mut commands: Commands,
-    cameras: Query<(Entity, &Camera)>,
+    cameras: Query<Entity, With<Camera>>,
     popup: Query<&TextPopup>,
 ) {
-    let (popup) = popup.get(trigger.entity).unwrap();
-    for (camid, camera) in cameras {
+    let popup = popup.get(trigger.entity).unwrap();
+    for camid in cameras {
         commands.spawn((
             Text::new(popup.text.clone()),
             popup.font.clone(),

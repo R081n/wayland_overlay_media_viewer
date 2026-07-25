@@ -2,9 +2,12 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 
-use crate::{animated_image::{
-    Gif, Gif3d, GifAsset, GifDespawn, GifNode, GifPlayer, messages::GifDespawnMessage,
-}, lifecycle::Closing};
+use crate::{
+    animated_image::{
+        Gif, Gif3d, GifAsset, GifDespawn, GifNode, GifPlayer, messages::GifDespawnMessage,
+    },
+    lifecycle::Closing,
+};
 
 #[derive(Component)]
 pub(crate) struct GifInitialized;

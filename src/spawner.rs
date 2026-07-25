@@ -7,13 +7,13 @@ use std::{
 use crate::{
     animated_image::{Gif3d, GifAsset},
     lifecycle::handle_slide_fade_in,
-    shader::{DynamicMaterial, ShaderRepeatPeriod, SHADER_TEMPLATE},
+    shader::{DynamicMaterial, SHADER_TEMPLATE, ShaderRepeatPeriod},
     texts::TextAnchor,
 };
 use crate::{
     lifecycle,
-    position::{PopupPosition, PIXELS_PER_METER},
-    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
+    position::{PIXELS_PER_METER, PopupPosition},
+    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 
@@ -28,6 +28,7 @@ pub struct ObjectMessage {
     pub close_condition: ObjectCloseCondition,
     pub movement: Movement,
     pub opacity: f32,
+    pub size: PopupSize,
 }
 
 #[derive(Clone, Debug)]
@@ -41,6 +42,20 @@ pub enum PopupLayer {
     Below,
     Normal,
     Above,
+}
+
+/// Set the size of the popup,
+/// Use auto when setting [`PopupPosition::FullScreen`]
+/// Unit is pixels
+#[derive(Clone, Copy, Debug)]
+pub enum PopupSize {
+    Auto,
+    /// Resize so that the larger side is this value,
+    ProportionalMax(f32),
+    /// Resize so that the smaller side is this value,
+    ProportionalMin(f32),
+    /// Stretch
+    Custom(Vec2),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -63,8 +78,10 @@ pub enum ObjectType {
 
 #[derive(Debug, Clone)]
 pub enum PopupInteraction {
-    ClickThough,
+    ClickThrough,
     Clickable,
+    /// Also implies movable
+    Draggable,
 }
 
 #[derive(Debug, Clone)]

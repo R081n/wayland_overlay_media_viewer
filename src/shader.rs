@@ -2,6 +2,8 @@ use bevy::{
     pbr::MaterialPlugin, prelude::*, reflect::TypePath, render::render_resource::AsBindGroup,
 };
 
+use crate::spawner::ProxyOpacity;
+
 pub struct DynamicShaderPlugin;
 
 impl Plugin for DynamicShaderPlugin {
@@ -125,13 +127,15 @@ fn tick_and_update_shader_timers(
         &mut ShaderRepeatPeriod,
         &Transform,
         &MeshMaterial3d<DynamicMaterial>,
+        &ProxyOpacity,
     )>,
 ) {
-    for (mut repeat_period, transform, material_handle) in &mut query {
+    for (mut repeat_period, transform, material_handle, proxy_opacity) in &mut query {
         repeat_period.timer.tick(time.delta());
         if let Some(mut extended_material) = materials.get_mut(material_handle) {
             extended_material.p_progress = repeat_period.timer.fraction() * std::f32::consts::TAU;
             extended_material.p_scale = transform.scale.xy();
+            extended_material.p_opacity = proxy_opacity.0;
         }
     }
 }

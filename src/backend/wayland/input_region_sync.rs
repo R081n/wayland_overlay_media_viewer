@@ -3,8 +3,8 @@ use wayland_client::protocol::wl_surface::WlSurface;
 
 use crate::{
     backend::wayland::{
-        backend::{wayland_event_system, WaylandEventQueue},
         WaylandAppState,
+        backend::{WaylandEventQueue, wayland_event_system},
     },
     position::ScreenPosition,
 };

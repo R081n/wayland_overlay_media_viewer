@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{
     camera::{NormalizedRenderTarget, RenderTarget},
     picking::{
@@ -12,7 +14,10 @@ use bevy::{
 };
 
 use crate::{
-    Clickable, RequestInputRecalc, draw_order::DrawOrder, lifecycle::{CloseOnClick, Closing, get_new_topmost_id}, spawner::PopupLayer,
+    Clickable, RequestInputRecalc,
+    draw_order::DrawOrder,
+    lifecycle::{CloseOnClick, Closing, Draggable, get_new_topmost_id},
+    spawner::PopupLayer,
 };
 
 pub struct PopupInteractionPlugin;
@@ -89,7 +94,7 @@ fn is_bottom_right_corner(local_hit: Vec3, size: Vec2) -> bool {
 fn on_right_drag_start(
     trigger: On<Pointer<DragStart>>,
     mut commands: Commands,
-    query: Query<(&Transform, &PopupLayer)>, // The base mesh is always the same 1x1 recangle
+    query: Query<(&Transform, &PopupLayer), With<Draggable>>, // The base mesh is always the same 1x1 recangle
 ) {
     let event = trigger.event();
     if event.button != PointerButton::Secondary {
@@ -200,7 +205,7 @@ fn on_right_dragging(
                     // The new center moves dynamically relative to the completely frozen top-left corner
                     transform.scale = new_scale;
                     transform.translation = resize.top_left_world_anchor + current_anchor_to_center;
-                     input_recalc.request();
+                    input_recalc.request();
                 }
             }
         }
@@ -248,6 +253,10 @@ fn on_left_click(
     query: Query<Has<CloseOnClick>>,
 ) {
     let event = trigger.event();
+
+    if trigger.duration > Duration::from_millis(200) {
+        return;
+    }
 
     if event.button != PointerButton::Primary || !query.get(event.entity).unwrap_or_default() {
         return;

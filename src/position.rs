@@ -6,7 +6,7 @@ use bevy::{
 #[derive(Debug, Clone, Copy)]
 pub enum PopupPosition {
     Global(Vec3),
-    SceenSpace(u32 /*or some id */, Vec2),
+    SceenSpace(ScreenspacePosition),
     FullScreen {
         screen: u32,
         // Relative to the center
@@ -15,6 +15,33 @@ pub enum PopupPosition {
         mode: FullScreenMode,
     },
     Random,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ScreenspacePosition {
+    /// Optional screen, else the global system
+    pub screen: Option<u32>,
+    /// Pixel position positive is always away from the anchor
+    pub position: Vec2,
+    pub anchor: Anchor,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Anchor {
+    pub vertical: VerticalAnchor,
+    pub horizontal: HorizontalAnchor,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum VerticalAnchor {
+    Top,
+    Bottom,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum HorizontalAnchor {
+    Left,
+    Right,
 }
 
 #[derive(Debug, Clone, Copy)]

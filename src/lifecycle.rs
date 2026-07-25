@@ -11,10 +11,14 @@ use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    draw_order::DrawOrder,
-    position::{FullScreenMode, PopupPosition, ScreenPosition, PIXELS_PER_METER},
-    spawner::{ObjectMessage, PopupLayer, PopupOutAnimation, ProxyOpacity, TargetOpacity},
     Clickable, RequestInputRecalc,
+    draw_order::DrawOrder,
+    position::{
+        FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition, ScreenspacePosition,
+    },
+    spawner::{
+        ObjectMessage, PopupLayer, PopupOutAnimation, PopupSize, ProxyOpacity, TargetOpacity,
+    },
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);
@@ -49,6 +53,12 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         msg.close_animation,
     ));
 
+    // Needs to happen before placing the popup
+    commands.trigger(|entity| SetPopupSize {
+        entity,
+        size: msg.size,
+    });
+
     match msg.position {
         PopupPosition::Global(vec3) => {
             commands
@@ -56,7 +66,9 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
                 .or_default()
                 .and_modify(move |mut t| *t = t.with_translation(vec3));
         }
-        PopupPosition::SceenSpace(_, _vec2) => todo!(),
+        PopupPosition::SceenSpace(position) => {
+            commands.trigger(|entity| PlaceAtScreenspacePosition { entity, position });
+        }
         PopupPosition::Random => {
             commands.trigger(PlaceAtRandomPosition);
         }
@@ -91,21 +103,12 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
     }
 
     match msg.behaviour {
-        crate::spawner::PopupInteraction::ClickThough => {
-            commands.insert((Pickable {
-                is_hoverable: false,
-                should_block_lower: false,
-            },));
-        }
+        crate::spawner::PopupInteraction::ClickThrough => {}
         crate::spawner::PopupInteraction::Clickable => {
-            commands.insert((
-                Clickable,
-                Pickable {
-                    is_hoverable: true,
-                    // Order is done via the DrawOrder struct
-                    should_block_lower: false,
-                },
-            ));
+            commands.insert(Clickable);
+        }
+        crate::spawner::PopupInteraction::Draggable => {
+            commands.insert((Draggable, Clickable));
         }
     }
 
@@ -133,6 +136,8 @@ impl Plugin for LiveCyclePlugin {
             .add_systems(First, make_visible_on_the_second_frame)
             .add_observer(handle_random_position)
             .add_observer(place_at_sceen_pos)
+            .add_observer(handle_screenspace_position)
+            .add_observer(set_popup_size)
             .add_observer(on_close_in);
     }
 }
@@ -276,6 +281,65 @@ fn handle_random_position(
     Ok(())
 }
 
+#[derive(EntityEvent)]
+struct PlaceAtScreenspacePosition {
+    entity: Entity,
+    position: ScreenspacePosition,
+}
+
+fn handle_screenspace_position(
+    trigger: On<PlaceAtScreenspacePosition>,
+    mut objects: Query<&mut Transform>,
+    screens: Query<&ScreenPosition>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
+) -> Result<(), BevyError> {
+    let mut obj = objects.get_mut(trigger.entity)?;
+
+    let image_size = obj.scale.xy();
+
+    let position = trigger.position;
+
+    let target = match trigger.position.screen {
+        Some(index) => screens
+            .iter()
+            .find(|s| s.index == index)
+            .map(|s| s.rect)
+            .ok_or("Screen does not exist")?,
+        None => screens
+            .iter()
+            .map(|s| s.rect)
+            .reduce(|a, b| a.union(b))
+            .ok_or("No screens")?,
+    };
+
+    let x = match position.anchor.horizontal {
+        crate::position::HorizontalAnchor::Left => {
+            target.min.x + position.position.x / PIXELS_PER_METER + image_size.x / 2.0
+        }
+        crate::position::HorizontalAnchor::Right => {
+            target.max.x - position.position.x / PIXELS_PER_METER - image_size.x / 2.0
+        }
+    };
+
+    let y = match position.anchor.vertical {
+        crate::position::VerticalAnchor::Bottom => {
+            target.min.y + position.position.y / PIXELS_PER_METER + image_size.y / 2.0
+        }
+        crate::position::VerticalAnchor::Top => {
+            target.max.y - position.position.y / PIXELS_PER_METER - image_size.y / 2.0
+        }
+    };
+
+    obj.translation = Vec3::new(x, y, 0.0);
+
+    input_recalc.request();
+
+    Ok(())
+}
+
+#[derive(Component, Debug, Clone, Default)]
+pub struct Draggable;
+
 #[derive(Component)]
 pub struct CloseOnClick;
 
@@ -378,10 +442,51 @@ fn place_at_sceen_pos(
     Ok(())
 }
 
+#[derive(EntityEvent)]
+struct SetPopupSize {
+    entity: Entity,
+    size: PopupSize,
+}
+
+fn set_popup_size(
+    trigger: On<SetPopupSize>,
+    mut objects: Query<&mut Transform>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
+) -> Result<(), BevyError> {
+    let size = trigger.size;
+
+    let mut object = objects.get_mut(trigger.entity)?;
+
+    let size = match size {
+        PopupSize::Auto => return Ok(()), // Already calculated by the respective spawner
+        PopupSize::ProportionalMax(max) => {
+            scale_to_fit(object.scale.xy(), Vec2::splat(max / PIXELS_PER_METER))
+        }
+        PopupSize::ProportionalMin(min) => {
+            scale_to_fit_but_the_other_way(object.scale.xy(), Vec2::splat(min / PIXELS_PER_METER))
+        }
+        PopupSize::Custom(vec2) => vec2 / PIXELS_PER_METER,
+    };
+
+    object.scale = size.extend(1.0);
+
+    input_recalc.request();
+
+    Ok(())
+}
+
 fn scale_to_fit(source: Vec2, target: Vec2) -> Vec2 {
     let scale_factors = target / source;
 
     let max_scale = scale_factors.min_element();
+
+    source * max_scale
+}
+
+fn scale_to_fit_but_the_other_way(source: Vec2, target: Vec2) -> Vec2 {
+    let scale_factors = target / source;
+
+    let max_scale = scale_factors.max_element();
 
     source * max_scale
 }
