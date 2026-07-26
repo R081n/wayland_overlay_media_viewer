@@ -2,8 +2,9 @@ use bevy::{
     ecs::component::Component,
     math::{I64Vec2, Rect, U64Vec2, Vec2, Vec3},
 };
+use serde::Deserialize;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub enum PopupPosition {
     Global(Vec3),
     SceenSpace(ScreenspacePosition),
@@ -18,7 +19,7 @@ pub enum PopupPosition {
     Random,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub struct ScreenspacePosition {
     /// Optional screen, else the global system
     pub screen: Option<u32>,
@@ -27,25 +28,25 @@ pub struct ScreenspacePosition {
     pub anchor: Anchor,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub struct Anchor {
     pub vertical: VerticalAnchor,
     pub horizontal: HorizontalAnchor,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub enum VerticalAnchor {
     Top,
     Bottom,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub enum HorizontalAnchor {
     Left,
     Right,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub enum FullScreenMode {
     One,
     All,
