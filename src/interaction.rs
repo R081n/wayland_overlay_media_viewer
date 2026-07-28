@@ -16,6 +16,7 @@ use bevy::{
 use crate::{
     Clickable, RequestInputRecalc,
     draw_order::DrawOrder,
+    input::{MediaSource, StartMediaDrag},
     lifecycle::{CloseOnClick, Closing, Draggable, get_new_topmost_id},
     spawner::PopupLayer,
 };
@@ -45,6 +46,7 @@ impl Plugin for PopupInteractionPlugin {
             .add_observer(on_left_click)
             .add_observer(on_right_drag_start)
             .add_observer(on_right_dragging)
+            .add_observer(on_left_drag_start)
             .add_observer(on_right_drag_end);
     }
 }
@@ -263,6 +265,26 @@ fn on_left_click(
     }
 
     commands.entity(event.entity).insert(Closing);
+}
+
+fn on_left_drag_start(
+    trigger: On<Pointer<DragStart>>,
+    mut commands: Commands,
+    query: Query<&MediaSource>,
+) {
+    if trigger.button != PointerButton::Primary {
+        return;
+    }
+    let Ok(source) = query.get(trigger.entity) else {
+        return;
+    };
+
+    commands
+        .entity(trigger.entity)
+        .trigger(|entity| StartMediaDrag {
+            entity,
+            source: source.clone(),
+        });
 }
 
 fn populate_ray_map_manually(

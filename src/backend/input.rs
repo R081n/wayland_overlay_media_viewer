@@ -27,3 +27,14 @@ pub struct PointerButton {
     pub button: Option<MouseButton>,
     pub pressed: bool,
 }
+
+#[derive(EntityEvent)]
+pub struct StartMediaDrag {
+    pub entity: Entity,
+    pub source: MediaSource,
+}
+
+#[derive(Component, Debug, Clone)]
+pub struct MediaSource {
+    pub path: String,
+}

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::io::ErrorKind;
+use std::path::PathBuf;
 
 use bevy::camera::visibility::NoFrustumCulling;
 use bevy::light::cluster::ClusterConfig;
@@ -15,12 +16,15 @@ use bevy::{
         extract_resource::ExtractResourcePlugin,
     },
 };
+use wayland_client::protocol::wl_data_device_manager;
 use wayland_client::{Connection, EventQueue, Proxy, QueueHandle};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
 use crate::RequestInputRecalc;
+use crate::backend::wayland::PendingPointerEventKind;
 use crate::backend::wayland::input_region_sync::LayerShellInputPlugin;
 use crate::backend::wayland::premultiply::WaylandPresentPlugin;
+use crate::input::StartMediaDrag;
 use crate::position::{PIXELS_PER_METER, ScreenPosition};
 use crate::{
     PointerSample, WallpaperPointerState, WallpaperSurfaceInfo, WallpaperTargetMonitor,
@@ -82,6 +86,7 @@ impl Plugin for WaylandBackendPlugin {
                 ExtractComponentPlugin::<WaylandRenderTarget>::default(),
             ))
             .add_systems(PostUpdate, wayland_event_system)
+            .add_observer(on_start_drag)
             .add_systems(First, pointer_input_system.in_set(PickingSystems::Input))
             .insert_non_send(WaylandEventQueue(event_queue))
             .insert_non_send(app_state)
@@ -347,6 +352,11 @@ fn apply_pointer_events(
             });
         }
 
+        if matches!(evt.kind, PendingPointerEventKind::Cancel) {
+            write(PointerAction::Cancel);
+            continue;
+        }
+
         sample.last_button = evt
             .kind
             .button_change()
@@ -534,4 +544,64 @@ fn selected_outputs(
             if v.is_empty() { None } else { Some(v) }
         }
     }
+}
+
+fn on_start_drag(
+    trigger: On<StartMediaDrag>,
+    mut app_state: NonSendMut<WaylandAppState>,
+    event_queue: NonSendMut<WaylandEventQueue>,
+) -> Result<(), BevyError> {
+    let app_state = &mut *app_state;
+    let focus = app_state
+        .pointer_focus
+        .as_ref()
+        .ok_or("No pointer focus when dragging")?;
+    let output = focus.output;
+    let surface = app_state.surfaces.get(&output).ok_or("Surface missing")?;
+
+    let manager: &wl_data_device_manager::WlDataDeviceManager =
+        app_state.data_device_manager.as_ref().ok_or("no manager")?;
+
+    let qh = event_queue.handle();
+
+    let device = app_state
+        .data_device
+        .get(&focus.seat_id)
+        .ok_or("No data device")?;
+
+    let source = manager.create_data_source(&qh, ());
+
+    source.offer("text/uri-list".to_owned());
+    let actions = wl_data_device_manager::DndAction::Copy;
+    source.set_actions(actions);
+    let mut path = trigger.source.path.clone();
+    if path.starts_with("https:") || path.starts_with("http:") || path.starts_with("file:") {
+        path = format!("{}\r\n", path);
+    } else {
+        let absolute = PathBuf::from(path)
+            .canonicalize()?
+            .to_string_lossy()
+            .into_owned();
+        path = format!("file://{}\r\n", absolute);
+    }
+
+    app_state.dragging_uri = path;
+
+    device.start_drag(
+        Some(&source),
+        &surface.surface,
+        None, // TODO add icon
+        focus.serial,
+    );
+
+    app_state.pending_pointer_events.push(PendingPointerEvent {
+        output: focus.output,
+        position: focus.position,
+        offset: Vec2::ZERO,
+        kind: PendingPointerEventKind::Cancel,
+    });
+
+    //app_state.dragging_source = Some(source);
+
+    Ok(())
 }

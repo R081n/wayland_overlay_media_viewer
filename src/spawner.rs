@@ -6,14 +6,15 @@ use std::{
 
 use crate::{
     animated_image::{Gif3d, GifAsset},
+    input::MediaSource,
     lifecycle::handle_slide_fade_in,
-    shader::{DynamicMaterial, ShaderRepeatPeriod, SHADER_TEMPLATE},
+    shader::{DynamicMaterial, SHADER_TEMPLATE, ShaderRepeatPeriod},
     texts::TextAnchor,
 };
 use crate::{
     lifecycle,
-    position::{PopupPosition, PIXELS_PER_METER},
-    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
+    position::{PIXELS_PER_METER, PopupPosition},
+    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 use serde::{Deserialize, Deserializer};
@@ -248,12 +249,15 @@ fn spawn_object(
     {
         for msg in pending {
             let mut common = match &msg.kind {
-                ObjectType::Image(_) => {
+                ObjectType::Image(image_mgs) => {
                     if let Ok(asset) = id.clone().try_typed::<Image>() {
                         let image = images.get(&asset).expect("asset to exist");
 
                         CommonProps {
                             commands: commands.spawn((
+                                MediaSource {
+                                    path: image_mgs.uri.clone(),
+                                },
                                 Mesh3d(default_meshes.rect.clone()),
                                 MeshMaterial3d(materials.add(StandardMaterial {
                                     base_color: Color::Srgba(Srgba::new(1., 1., 1., msg.opacity)),
@@ -278,6 +282,9 @@ fn spawn_object(
                             commands: commands.spawn((
                                 Gif3d {
                                     handle: asset.clone(),
+                                },
+                                MediaSource {
+                                    path: image_mgs.uri.clone(),
                                 },
                                 Mesh3d(default_meshes.rect.clone()),
                                 MeshMaterial3d(materials.add(StandardMaterial {
@@ -349,6 +356,9 @@ fn spawn_videos(
         commands
             .spawn((
                 component,
+                MediaSource {
+                    path: video.uri.clone(),
+                },
                 Mesh3d(default_meshes.rect.clone()),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     unlit: true,

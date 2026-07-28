@@ -6,17 +6,20 @@ pub mod surface;
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
 
 use bevy::prelude::*;
-use wayland_client::Proxy;
-use wayland_client::protocol::wl_display;
+use wayland_client::protocol::wl_data_device::{self, WlDataDevice};
+use wayland_client::protocol::wl_data_device_manager::WlDataDeviceManager;
 use wayland_client::protocol::wl_region::WlRegion;
+use wayland_client::protocol::{wl_data_offer, wl_data_source, wl_display};
 use wayland_client::{
     Connection, Dispatch, QueueHandle,
     protocol::{
         wl_callback, wl_compositor, wl_output, wl_pointer, wl_registry, wl_seat, wl_surface,
     },
 };
+use wayland_client::{Proxy, event_created_child};
 use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::WpCursorShapeDeviceV1;
 use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_manager_v1::WpCursorShapeManagerV1;
 use wayland_protocols::xdg::xdg_output::zv1::client::{zxdg_output_manager_v1, zxdg_output_v1};
@@ -28,6 +31,9 @@ use self::surface::WaylandSurfaceHandles;
 pub(crate) struct PointerFocus {
     output: u32,
     position: Vec2,
+    seat_id: u32,
+    /// Pointer serial
+    serial: u32,
 }
 
 #[derive(Resource)]
@@ -53,6 +59,10 @@ pub(crate) struct WaylandAppState {
     pub xdg_outputs: HashMap<u32, zxdg_output_v1::ZxdgOutputV1>,
     pub cursor_shape_manager: Option<WpCursorShapeManagerV1>,
     pub cursor_shape_devices: HashMap<u32, WpCursorShapeDeviceV1>,
+    pub data_device_manager: Option<WlDataDeviceManager>,
+    pub data_device: HashMap<u32, WlDataDevice>,
+    pub dragging_uri: String,
+    //pub dragging_source: Option<wl_data_source::WlDataSource>,
 }
 
 pub(crate) struct OutputSurface {
@@ -75,6 +85,7 @@ pub(crate) enum PendingPointerEventKind {
         button: Option<MouseButton>,
         pressed: bool,
     },
+    Cancel,
 }
 
 impl PendingPointerEventKind {
@@ -83,6 +94,7 @@ impl PendingPointerEventKind {
         match self {
             PendingPointerEventKind::Motion => None,
             PendingPointerEventKind::Button { button, pressed } => Some((*button, *pressed)),
+            PendingPointerEventKind::Cancel => None,
         }
     }
 }
@@ -118,6 +130,10 @@ impl WaylandAppState {
             xdg_outputs: HashMap::new(),
             cursor_shape_manager: None,
             cursor_shape_devices: HashMap::new(),
+            data_device_manager: None,
+            data_device: HashMap::new(),
+            dragging_uri: String::new(),
+            // dragging_source: None,
         }
     }
 
@@ -162,6 +178,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WaylandAppState {
                 let _span_guard =
                     trace_span!("wl_registry::Event::Global", name, interface, version).entered();
 
+                info!("registry: {}", interface);
                 match interface.as_str() {
                     "wl_compositor" => {
                         info!("Compositor found: {} (version {})", name, version);
@@ -192,7 +209,14 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WaylandAppState {
                             "wp_cursor_shape_manager_v1 found: {} (version {})",
                             name, version
                         );
-                        state.cursor_shape_manager = Some(registry.bind(name, version, qh, ()))
+                        state.cursor_shape_manager = Some(registry.bind(name, version, qh, ()));
+                    }
+                    "wl_data_device_manager" => {
+                        info!(
+                            "wl_data_device_manager found: {} (version {})",
+                            name, version
+                        );
+                        state.data_device_manager = Some(registry.bind(name, version, qh, ()));
                     }
                     _ => {}
                 }
@@ -282,6 +306,12 @@ impl Dispatch<wl_seat::WlSeat, ()> for WaylandAppState {
                                 let pointer = manager.get_pointer(&pointer, qh, ());
                                 state.cursor_shape_devices.insert(seat_id, pointer);
                             };
+
+                            if let Some(manager) = &state.data_device_manager {
+                                state
+                                    .data_device
+                                    .insert(seat_id, manager.get_data_device(seat, qh, ()));
+                            }
                             entry.insert(pointer);
                         }
                     }
@@ -327,7 +357,12 @@ impl Dispatch<wl_pointer::WlPointer, u32> for WaylandAppState {
                     .map(|info| Vec2::new(info.x as f32, info.y as f32))
                     .unwrap_or(Vec2::ZERO);
                 let position = Vec2::new(surface_x as f32, surface_y as f32);
-                state.pointer_focus = Some(PointerFocus { output, position });
+                state.pointer_focus = Some(PointerFocus {
+                    output,
+                    position,
+                    seat_id: *seat_id,
+                    serial,
+                });
                 state.pending_pointer_events.push(PendingPointerEvent {
                     output,
                     position,
@@ -361,9 +396,10 @@ impl Dispatch<wl_pointer::WlPointer, u32> for WaylandAppState {
             wl_pointer::Event::Button {
                 button,
                 state: btn_state,
+                serial,
                 ..
             } => {
-                if let Some(focus) = state.pointer_focus.as_ref() {
+                if let Some(focus) = &mut state.pointer_focus {
                     let offset = state
                         .output_info
                         .get(&focus.output)
@@ -378,6 +414,8 @@ impl Dispatch<wl_pointer::WlPointer, u32> for WaylandAppState {
                             other => u16::try_from(other).ok().map(MouseButton::Other),
                         }
                     };
+
+                    focus.serial = serial;
 
                     state.pending_pointer_events.push(PendingPointerEvent {
                         output: focus.output,
@@ -600,6 +638,94 @@ impl Dispatch<zxdg_output_v1::ZxdgOutputV1, u32> for WaylandAppState {
             }
             _ => {}
         }
+    }
+}
+
+impl Dispatch<wl_data_source::WlDataSource, ()> for WaylandAppState {
+    fn event(
+        state: &mut Self,
+        source: &wl_data_source::WlDataSource,
+        event: wl_data_source::Event,
+        _data: &(),
+        _conn: &wayland_client::Connection,
+        _qhandle: &wayland_client::QueueHandle<Self>,
+    ) {
+        match event {
+            wl_data_source::Event::Target { .. } => {
+            }
+            wl_data_source::Event::Send { mime_type, fd } => {
+                // The target wants the data. Write to the provided file descriptor.
+                if mime_type == "text/uri-list" {
+                    // Convert the raw OwnedFd into a standard Rust File/Write object
+                    let mut file: std::fs::File = fd.into();
+
+                    println!("{}", state.dragging_uri);
+                    if let Err(e) = file.write_all(state.dragging_uri.as_bytes()) {
+                        eprintln!("Failed to stream URI list to target: {}", e);
+                    }
+                }
+            }
+            wl_data_source::Event::Cancelled => {
+                // Drag was aborted by user or failed
+                println!("Drag cancelled.");
+                source.destroy();
+                // state.dragging_source = None;
+            }
+            wl_data_source::Event::DndDropPerformed => {
+                println!("User dropped the item onto a valid target.");
+            }
+            wl_data_source::Event::DndFinished => {
+                // Target is fully done reading data. Safe to clean up resources.
+                println!("Drag and drop session successfully finished.");
+                source.destroy();
+                //state.dragging_source = None;
+            }
+            wl_data_source::Event::Action { dnd_action } => {
+                // compositor picked an action (e.g. Copy, Move)
+                println!("Compositor chose action: {:?}", dnd_action);
+            }
+            _ => {}
+        }
+    }
+}
+
+impl Dispatch<WlDataDevice, ()> for WaylandAppState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WlDataDevice,
+        _event: <WlDataDevice as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+    }
+
+    event_created_child!(WaylandAppState, wl_data_device::WlDataDevice, [
+        0 => (wl_data_offer::WlDataOffer, ()) // 0 is the wl_data_device::data_offer opcode
+    ]);
+}
+
+impl Dispatch<wl_data_offer::WlDataOffer, ()> for WaylandAppState {
+    fn event(
+        _state: &mut Self,
+        _offer: &wl_data_offer::WlDataOffer,
+        _event: wl_data_offer::Event,
+        _data: &(),
+        _conn: &wayland_client::Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+    }
+}
+
+impl Dispatch<WlDataDeviceManager, ()> for WaylandAppState {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WlDataDeviceManager,
+        _event: <WlDataDeviceManager as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
     }
 }
 

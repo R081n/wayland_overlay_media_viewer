@@ -4,8 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
-
 raw-window-handle = "0.6.2"
 wgpu = { version = "29.0.3" }
 
@@ -50,7 +48,6 @@ features = [
     "default_app",
     "common_api",
     "3d_api",
-    "3d_bevy_render",
     "ui_api",
     "ui_bevy_render",
 
@@ -64,11 +61,10 @@ features = [
     "3d_api",
     "bevy_render",
     "bevy_core_pipeline",
-    "bevy_gizmos_render",
+    #"bevy_gizmos_render",
     "bevy_anti_alias",
     "bevy_pbr",
-    "bevy_post_process",
-    "gltf_animation",
+    #"bevy_post_process",
 ]
 
 [profile.dev]
