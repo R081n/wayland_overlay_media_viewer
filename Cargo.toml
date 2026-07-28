@@ -12,7 +12,11 @@ wgpu = { version = "29.0.3" }
 # wayland
 wayland-backend = { version = "0.3.11", features = ["client_system"] }
 wayland-client = { version = "0.31.11" }
-wayland-protocols = { version = "0.32.9", features = ["client", "unstable"] }
+wayland-protocols = { version = "0.32.9", features = [
+    "client",
+    "unstable",
+    "staging",
+] }
 wayland-protocols-wlr = { version = "0.3.8", features = ["client"] }
 
 #videos
@@ -21,7 +25,6 @@ cpal = "0.15"
 
 image = "0.25"
 ringbuf = "0.4"
-bevy_framepace = "0.22.0"
 thiserror = "2.0.17"
 crossbeam-channel = "0.5.16"
 bevy_rand = { version = "0.15.0", features = ["wyrand"] }
@@ -55,7 +58,17 @@ features = [
     "std",
     "default_font",
     "multi_threaded",
-    "wayland",
+
+
+    #3d_bevy_render without bevy_gltf
+    "3d_api",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_gizmos_render",
+    "bevy_anti_alias",
+    "bevy_pbr",
+    "bevy_post_process",
+    "gltf_animation",
 ]
 
 [profile.dev]

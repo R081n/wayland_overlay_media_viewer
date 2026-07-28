@@ -17,9 +17,10 @@ use std::time::Duration;
 
 pub use backend::*;
 use bevy::{
-    DefaultPlugins,
-    app::{App, PluginGroup as _, PreUpdate, Startup, TerminalCtrlCHandlerPlugin, Update},
-    asset::{AssetPlugin, io::web::WebAssetPlugin},
+    app::{
+        App, PluginGroup as _, PreUpdate, ScheduleRunnerPlugin, TerminalCtrlCHandlerPlugin, Update,
+    },
+    asset::{io::web::WebAssetPlugin, AssetPlugin},
     camera::ClearColor,
     color::Color,
     ecs::{
@@ -32,9 +33,8 @@ use bevy::{
     prelude::*,
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::WindowPlugin,
-    winit::WinitPlugin,
+    DefaultPlugins,
 };
-use bevy_framepace::{FramepacePlugin, FramepaceSettings};
 use bevy_rand::{plugin::EntropyPlugin, prelude::WyRand};
 use crossbeam_channel::{Receiver, Sender};
 
@@ -45,7 +45,7 @@ use crate::{
     lifecycle::LiveCyclePlugin,
     position::ScreenPosition,
     shader::DynamicShaderPlugin,
-    spawner::{ObjectMessage, PopupPlugin, preload_asset},
+    spawner::{preload_asset, ObjectMessage, PopupPlugin},
     texts::TextOverlayPlugin,
     videos::plugin::VideoPlugin,
 };
@@ -100,9 +100,6 @@ fn startup_inner(rx: DataReceiver) {
             .set(window_plugin)
             .disable::<PipelinedRenderingPlugin>()
             .disable::<TerminalCtrlCHandlerPlugin>()
-            .set(WinitPlugin {
-                run_on_any_thread: true,
-            })
             .set(AssetPlugin {
                 unapproved_path_mode: bevy::asset::UnapprovedPathMode::Allow,
                 ..Default::default()
@@ -114,8 +111,12 @@ fn startup_inner(rx: DataReceiver) {
                 ..Default::default()
             }),
         PopupPlugin,
+        ScheduleRunnerPlugin {
+            run_mode: bevy::app::RunMode::Loop {
+                wait: Some(Duration::from_secs_f64(1.0 / 60.0)),
+            },
+        },
         VideoPlugin,
-        FramepacePlugin,
         LiveCyclePlugin,
         AnimatedImagePlugin,
         CustomDrawOrderPlugin,
@@ -141,8 +142,7 @@ fn startup_inner(rx: DataReceiver) {
         target_monitor: WallpaperTargetMonitor::All,
     });
     app.set_error_handler(my_error_handler);
-    app.add_systems(Startup, setup)
-        .add_systems(PreUpdate, forward_messages.before(preload_asset))
+    app.add_systems(PreUpdate, forward_messages.before(preload_asset))
         .run();
 }
 
@@ -152,10 +152,6 @@ fn my_error_handler(error: BevyError, ctx: ErrorContext) {
         return;
     }
     bevy::ecs::error::error(error, ctx);
-}
-
-fn setup(mut framepace: ResMut<FramepaceSettings>) {
-    framepace.limiter = bevy_framepace::Limiter::Manual(Duration::from_secs_f64(1.0 / 60.));
 }
 
 fn forward_messages(
