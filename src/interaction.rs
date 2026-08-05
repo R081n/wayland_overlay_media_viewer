@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use bevy::{
     camera::{NormalizedRenderTarget, RenderTarget},
-    math::VectorSpace,
     picking::{
         PickingSystems,
         backend::{
