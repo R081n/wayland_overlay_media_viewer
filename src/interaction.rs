@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use bevy::{
     camera::{NormalizedRenderTarget, RenderTarget},
+    math::VectorSpace,
     picking::{
         PickingSystems,
         backend::{
@@ -25,7 +26,7 @@ pub struct PopupInteractionPlugin;
 
 impl Plugin for PopupInteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.add_systems(First, clear_drag_speed).add_systems(
             First,
             evaluate_hits_manually_fallback
                 // Run after our manual RayMap calculation step finishes
@@ -53,6 +54,9 @@ impl Plugin for PopupInteractionPlugin {
 
 // --- Main World Components ---
 
+pub type NotCurrentlyDragging = (Without<RightDragging>, Without<RightResizing>);
+pub type CurrentlyDragging = (RightDragging, RightResizing);
+
 /// Tracks state parameters while an item is actively manipulated by a specific pointer.
 #[derive(Component)]
 #[component(storage = "SparseSet")]
@@ -60,6 +64,7 @@ pub struct RightDragging {
     pub pointer_id: PointerId,
     pub camera_entity: Entity,
     pub initial_offset: Vec3,
+    pub drag_speed: Vec2,
 }
 /// State stored during a resize operation.
 #[derive(Component)]
@@ -90,6 +95,12 @@ fn is_bottom_right_corner(local_hit: Vec3, size: Vec2) -> bool {
     let threshold_y = size.y * 0.2;
 
     (local_hit.x - target_x).abs() < threshold_x && (local_hit.y - target_y).abs() < threshold_y
+}
+
+fn clear_drag_speed(query: Query<&mut RightDragging>) {
+    for mut drag in query {
+        drag.drag_speed = Vec2::ZERO;
+    }
 }
 
 /// Listens globally for drag actions to filter for Right Mouse clicks, branching into drag or resize.
@@ -140,6 +151,7 @@ fn on_right_drag_start(
                 pointer_id: event.pointer_id,
                 camera_entity: event.hit.camera,
                 initial_offset,
+                drag_speed: Vec2::ZERO,
             },
             get_new_topmost_id(*layer),
         ));
@@ -151,9 +163,10 @@ fn on_right_dragging(
     trigger: On<Pointer<Drag>>,
     mut dragged_entities: Query<(
         &mut Transform,
-        Option<&RightDragging>,
+        Option<&mut RightDragging>,
         Option<&RightResizing>,
     )>,
+    time: Res<Time>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mut input_recalc: ResMut<RequestInputRecalc>,
 ) {
@@ -215,7 +228,7 @@ fn on_right_dragging(
     }
 
     // BRANCH 2: Drag Behavior
-    if let Some(drag) = dragging {
+    if let Some(mut drag) = dragging {
         if event.pointer_id != drag.pointer_id {
             return;
         }
@@ -234,7 +247,9 @@ fn on_right_dragging(
             if denominator.abs() > f32::EPSILON {
                 let distance = (original_hit_point - ray.origin).dot(*camera_forward) / denominator;
                 let current_ray_intersection = ray.origin + ray.direction * distance;
+                let last = transform.translation;
                 transform.translation = current_ray_intersection + drag.initial_offset;
+                drag.drag_speed = (transform.translation - last).xy() / time.delta_secs();
                 input_recalc.request();
             }
         }
