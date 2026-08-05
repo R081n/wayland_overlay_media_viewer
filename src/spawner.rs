@@ -1,4 +1,5 @@
 use std::{
+    ops::{RangeInclusive, RangeTo},
     path::PathBuf,
     sync::{Arc, Mutex},
     time::Duration,
@@ -8,13 +9,13 @@ use crate::{
     animated_image::{Gif3d, GifAsset},
     input::MediaSource,
     lifecycle::handle_slide_fade_in,
-    shader::{DynamicMaterial, SHADER_TEMPLATE, ShaderRepeatPeriod},
+    shader::{DynamicMaterial, ShaderRepeatPeriod, SHADER_TEMPLATE},
     texts::TextAnchor,
 };
 use crate::{
     lifecycle,
-    position::{PIXELS_PER_METER, PopupPosition},
-    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
+    position::{PopupPosition, PIXELS_PER_METER},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 use serde::{Deserialize, Deserializer};
@@ -101,10 +102,20 @@ pub enum PopupOutAnimation {
     },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 pub enum Movement {
     None,
     Linear(Vec2),
+    CdBounce(CdBounce),
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Component)]
+pub struct CdBounce {
+    pub speed: Vec2,
+    // maximum angle deviation when bouncing
+    pub angle_uncertanty: f32,
+    pub speed_uncertanty: f32,
+    pub speed_range: (f32, f32),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -455,14 +466,13 @@ fn spawn_text(
 
         // Can't show text in background
         new.layer = PopupLayer::Above;
-        let mut commands = commands.spawn((
+        commands.spawn((
             Mesh3d(default_meshes.rect.clone()),
             text.clone(),
             Transform::from_scale(Vec3::ONE).with_translation(Vec3::ONE * -100.0),
             DeferredText(new.clone()),
+            Visibility::Hidden,
         ));
-
-        lifecycle::insert_components(&mut commands, &new);
     }
 }
 
@@ -478,7 +488,9 @@ fn wait_for_text_to_have_size(
             if computed.size() != Vec2::ZERO {
                 let mut commands = commands.entity(entity);
                 commands.remove::<DeferredText>();
+
                 lifecycle::insert_components(&mut commands, &defferend_text.0);
+                break;
             }
         }
     }

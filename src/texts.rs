@@ -2,9 +2,9 @@ use std::ops::Div;
 
 use bevy::prelude::*;
 
-use crate::RequestInputRecalc;
 use crate::position::PIXELS_PER_METER;
 use crate::spawner::{ProxyOpacity, TextPopup};
+use crate::RequestInputRecalc;
 
 pub struct TextOverlayPlugin;
 
@@ -36,7 +36,7 @@ fn create_new_texts(
             popup.font.clone(),
             UiTargetCamera(camid),
             AnchoredText(trigger.entity),
-            TextColor(popup.color),
+            TextColor(popup.color.with_alpha(0.0)),
         ));
     }
 }

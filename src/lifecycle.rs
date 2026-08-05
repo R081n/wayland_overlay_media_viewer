@@ -5,20 +5,24 @@ use std::{
 };
 
 use bevy::{
-    light::NotShadowCaster, math::I64Vec2, prelude::*, render::batching::NoAutomaticBatching,
+    light::NotShadowCaster,
+    math::{I64Vec2, VectorSpace},
+    prelude::*,
+    render::batching::NoAutomaticBatching,
 };
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
-    Clickable, RequestInputRecalc,
     draw_order::DrawOrder,
     position::{
-        FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition, ScreenspacePosition,
+        FullScreenMode, PopupPosition, ScreenPosition, ScreenspacePosition, PIXELS_PER_METER,
     },
     spawner::{
-        ObjectMessage, PopupLayer, PopupOutAnimation, PopupSize, ProxyOpacity, TargetOpacity,
+        CdBounce, ObjectMessage, PopupLayer, PopupOutAnimation, PopupSize, ProxyOpacity,
+        TargetOpacity,
     },
+    Clickable, RequestInputRecalc,
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);
@@ -117,6 +121,9 @@ pub fn insert_components(commands: &mut EntityCommands<'_>, msg: &ObjectMessage)
         crate::spawner::Movement::Linear(vec2) => {
             commands.insert(LinearMovement(vec2));
         }
+        crate::spawner::Movement::CdBounce(cd_bounce) => {
+            commands.insert(cd_bounce);
+        }
     }
 
     commands.insert((
@@ -132,7 +139,7 @@ impl Plugin for LiveCyclePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (handle_slide_fade_in, handle_closing).chain())
             //No special ordering
-            .add_systems(Update, handle_moving)
+            .add_systems(Update, (handle_moving, handle_cd_bounce).chain())
             .add_systems(First, make_visible_on_the_second_frame)
             .add_observer(handle_random_position)
             .add_observer(place_at_sceen_pos)
@@ -538,4 +545,70 @@ fn handle_moving(
         transform.translation += movement.0.extend(0.0) * delta;
         input_recalc.request();
     }
+}
+
+fn handle_cd_bounce(
+    mut commands: Commands,
+    query: Query<(Entity, &mut Transform, &mut CdBounce)>,
+    time: Res<Time>,
+    screens: Query<&ScreenPosition>,
+    mut input_recalc: ResMut<RequestInputRecalc>,
+    mut rng: Single<&mut WyRand, With<GlobalRng>>,
+) {
+    for (id, mut transform, mut movement) in query {
+        let Some(screen) = screens
+            .iter()
+            .find(|s| s.rect.contains(transform.translation.xy()))
+        else {
+            warn!(
+                "CdBounce was not inside a screen, choosing random {}",
+                transform.translation
+            );
+            commands.entity(id).trigger(PlaceAtRandomPosition);
+            continue;
+        };
+
+        let delta = time.delta_secs();
+        let movement = &mut *movement;
+        transform.translation += movement.speed.extend(0.0) * delta;
+
+        let rect = transform_to_rect(&transform);
+        let translation = &mut transform.translation;
+        let speed = &mut movement.speed;
+
+        let mut bounced = false;
+        for (larger, smaller, bounce_dir) in [
+            (rect.max, screen.rect.max, -1.),
+            (screen.rect.min, rect.min, 1.),
+        ] {
+            for (pos, speed, larger, smaller) in [
+                (&mut translation.x, &mut speed.x, larger.x, smaller.x),
+                (&mut translation.y, &mut speed.y, larger.y, smaller.y),
+            ] {
+                if larger > smaller {
+                    *speed *= -1.;
+                    *pos += (larger - smaller) * bounce_dir;
+                    bounced = true;
+                }
+            }
+        }
+
+        if bounced {
+            let mut angle = speed.to_angle();
+            let mut len = speed.length();
+            angle += (rng.random::<f32>() - rng.random::<f32>()) * movement.angle_uncertanty;
+            len += ((rng.random::<f32>() - rng.random::<f32>()) * movement.speed_uncertanty)
+                .clamp(movement.speed_range.0, movement.speed_range.1);
+
+            *speed = Vec2::from_angle(angle) * len;
+        }
+
+        input_recalc.request();
+    }
+}
+
+fn transform_to_rect(transform: &Transform) -> Rect {
+    let center = transform.translation.xy();
+    let size = transform.scale.xy().max(Vec2::ZERO);
+    Rect::from_center_size(center, size)
 }
