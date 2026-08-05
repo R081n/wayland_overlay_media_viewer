@@ -5,24 +5,21 @@ use std::{
 };
 
 use bevy::{
-    light::NotShadowCaster,
-    math::{I64Vec2, VectorSpace},
-    prelude::*,
-    render::batching::NoAutomaticBatching,
+    light::NotShadowCaster, math::I64Vec2, prelude::*, render::batching::NoAutomaticBatching,
 };
 use bevy_rand::{global::GlobalRng, prelude::WyRand};
 use rand::RngExt;
 
 use crate::{
+    Clickable, RequestInputRecalc,
     draw_order::DrawOrder,
     position::{
-        FullScreenMode, PopupPosition, ScreenPosition, ScreenspacePosition, PIXELS_PER_METER,
+        FullScreenMode, PIXELS_PER_METER, PopupPosition, ScreenPosition, ScreenspacePosition,
     },
     spawner::{
         CdBounce, ObjectMessage, PopupLayer, PopupOutAnimation, PopupSize, ProxyOpacity,
         TargetOpacity,
     },
-    Clickable, RequestInputRecalc,
 };
 static NEXT_ID_BELOW: AtomicI64 = AtomicI64::new(i64::MIN);
 static NEXT_ID_NORMAL: AtomicI64 = AtomicI64::new(0);

@@ -1,5 +1,4 @@
 use std::{
-    ops::{RangeInclusive, RangeTo},
     path::PathBuf,
     sync::{Arc, Mutex},
     time::Duration,
@@ -9,13 +8,13 @@ use crate::{
     animated_image::{Gif3d, GifAsset},
     input::MediaSource,
     lifecycle::handle_slide_fade_in,
-    shader::{DynamicMaterial, ShaderRepeatPeriod, SHADER_TEMPLATE},
+    shader::{DynamicMaterial, SHADER_TEMPLATE, ShaderRepeatPeriod},
     texts::TextAnchor,
 };
 use crate::{
     lifecycle,
-    position::{PopupPosition, PIXELS_PER_METER},
-    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
+    position::{PIXELS_PER_METER, PopupPosition},
+    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
 use serde::{Deserialize, Deserializer};

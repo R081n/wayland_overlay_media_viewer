@@ -61,6 +61,7 @@ pub struct DataReceiver {
 }
 
 impl AppHandle {
+    #[allow(clippy::result_large_err)]
     pub fn send(
         &self,
         msg: ObjectMessage,

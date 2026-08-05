@@ -2,9 +2,9 @@ use std::ops::Div;
 
 use bevy::prelude::*;
 
+use crate::RequestInputRecalc;
 use crate::position::PIXELS_PER_METER;
 use crate::spawner::{ProxyOpacity, TextPopup};
-use crate::RequestInputRecalc;
 
 pub struct TextOverlayPlugin;
 

@@ -651,8 +651,7 @@ impl Dispatch<wl_data_source::WlDataSource, ()> for WaylandAppState {
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
         match event {
-            wl_data_source::Event::Target { .. } => {
-            }
+            wl_data_source::Event::Target { .. } => {}
             wl_data_source::Event::Send { mime_type, fd } => {
                 // The target wants the data. Write to the provided file descriptor.
                 if mime_type == "text/uri-list" {
