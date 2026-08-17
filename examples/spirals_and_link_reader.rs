@@ -87,7 +87,7 @@ fn main() {
         layer: PopupLayer::Above,
         popup_animation: PopupInAnimation::None,
         behaviour: PopupInteraction::ClickThrough,
-        opacity: 0.,
+        opacity: 0.2,
         close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
         close_condition: ObjectCloseCondition {
             duration: None,
@@ -162,7 +162,7 @@ fn main() {
                             kind: to_type(entry.path().to_string_lossy().into_owned()),
                             position: PopupPosition::Random,
                             popup_animation: PopupInAnimation::SlideFadeIn,
-                            behaviour: PopupInteraction::ClickThrough,
+                            behaviour: PopupInteraction::Draggable,
                             opacity: 0.8,
                             layer: PopupLayer::Normal,
                             close_animation: PopupOutAnimation::FadeOut { decay_rate: 0.1 },

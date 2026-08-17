@@ -1,6 +1,14 @@
+use std::env;
+
+use schemars::schema_for;
 use wayland_overlay_media_viewer::spawner::ObjectMessage;
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args[1] == "schema" {
+        println!("{:?}", schema_for!(ObjectMessage));
+        return;
+    }
     let sender = wayland_overlay_media_viewer::startup();
 
     for line in std::io::stdin().lines() {

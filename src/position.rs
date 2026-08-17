@@ -2,10 +2,12 @@ use bevy::{
     ecs::component::Component,
     math::{I64Vec2, Rect, U64Vec2, Vec2, Vec3},
 };
+use schemars::JsonSchema;
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
 pub enum PopupPosition {
+    #[schemars(with = "crate::schemar_proxies::Vec3")]
     Global(Vec3),
     SceenSpace(ScreenspacePosition),
     FullScreen {
@@ -13,40 +15,42 @@ pub enum PopupPosition {
         /// Relative to the center
         ///
         /// screen is normalized to [-1, 1],
+        #[schemars(with = "crate::schemar_proxies::Vec2")]
         relative_center: Vec2,
         mode: FullScreenMode,
     },
     Random,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
 pub struct ScreenspacePosition {
     /// Optional screen, else the global system
     pub screen: Option<u32>,
     /// Pixel position positive is always away from the anchor
+    #[schemars(with = "crate::schemar_proxies::Vec2")]
     pub position: Vec2,
     pub anchor: Anchor,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
 pub struct Anchor {
     pub vertical: VerticalAnchor,
     pub horizontal: HorizontalAnchor,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
 pub enum VerticalAnchor {
     Top,
     Bottom,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
 pub enum HorizontalAnchor {
     Left,
     Right,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
 pub enum FullScreenMode {
     One,
     All,

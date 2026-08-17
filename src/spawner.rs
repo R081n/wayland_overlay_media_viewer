@@ -8,18 +8,19 @@ use crate::{
     animated_image::{Gif3d, GifAsset},
     input::MediaSource,
     lifecycle::handle_slide_fade_in,
-    shader::{DynamicMaterial, SHADER_TEMPLATE, ShaderRepeatPeriod},
+    shader::{DynamicMaterial, ShaderRepeatPeriod, SHADER_TEMPLATE},
     texts::TextAnchor,
 };
 use crate::{
     lifecycle,
-    position::{PIXELS_PER_METER, PopupPosition},
-    videos::plugin::{VideoPlayer, VideoState, VideoTarget, insert_video_component},
+    position::{PopupPosition, PIXELS_PER_METER},
+    videos::plugin::{insert_video_component, VideoPlayer, VideoState, VideoTarget},
 };
 use bevy::{asset::LoadState, platform::collections::HashMap, prelude::*};
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer};
 
-#[derive(Message, Clone, Debug, Deserialize)]
+#[derive(Message, Clone, Debug, Deserialize, JsonSchema)]
 pub struct ObjectMessage {
     pub kind: ObjectType,
     pub position: PopupPosition,
@@ -33,13 +34,13 @@ pub struct ObjectMessage {
     pub size: PopupSize,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema)]
 pub struct ObjectCloseCondition {
     pub duration: Option<Duration>,
     pub click: Option<CloseClickSettings>,
 }
 
-#[derive(Component, Clone, Copy, Debug, Deserialize)]
+#[derive(Component, Clone, Copy, Debug, Deserialize, JsonSchema)]
 pub enum PopupLayer {
     Below,
     Normal,
@@ -49,7 +50,7 @@ pub enum PopupLayer {
 /// Set the size of the popup,
 /// Use auto when setting [`PopupPosition::FullScreen`]
 /// Unit is pixels
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, JsonSchema)]
 pub enum PopupSize {
     Auto,
     /// Resize so that the larger side is this value,
@@ -57,10 +58,11 @@ pub enum PopupSize {
     /// Resize so that the smaller side is this value,
     ProportionalMin(f32),
     /// Stretch
+    #[schemars(with = "crate::schemar_proxies::Vec2")]
     Custom(Vec2),
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, JsonSchema)]
 pub struct CloseClickSettings {}
 
 #[derive(Component)]
@@ -70,7 +72,7 @@ pub struct TargetOpacity(pub f32);
 #[derive(Component)]
 pub struct ProxyOpacity(pub f32);
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub enum ObjectType {
     Image(PopupImage),
     Video(PopupVideo),
@@ -78,7 +80,7 @@ pub enum ObjectType {
     Text(TextPopup),
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub enum PopupInteraction {
     ClickThrough,
     Clickable,
@@ -86,13 +88,13 @@ pub enum PopupInteraction {
     Draggable,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub enum PopupInAnimation {
     None,
     SlideFadeIn,
 }
 
-#[derive(Debug, Clone, Copy, Default, Component, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Component, Deserialize, JsonSchema)]
 pub enum PopupOutAnimation {
     #[default]
     None,
@@ -101,15 +103,17 @@ pub enum PopupOutAnimation {
     },
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
 pub enum Movement {
     None,
+    #[schemars(with = "crate::schemar_proxies::Vec2")]
     Linear(Vec2),
     CdBounce(CdBounce),
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Component)]
+#[derive(Debug, Clone, Copy, Deserialize, Component, JsonSchema)]
 pub struct CdBounce {
+    #[schemars(with = "crate::schemar_proxies::Vec2")]
     pub speed: Vec2,
     // maximum angle deviation when bouncing
     pub angle_uncertanty: f32,
@@ -117,56 +121,56 @@ pub struct CdBounce {
     pub speed_range: (f32, f32),
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct PopupImage {
     pub uri: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub enum FileType {
     StaticImage,
     WebP,
     Gif,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct PopupVideo {
     pub uri: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct CustomShaderSource {
     pub code: String,
     pub duraton: f32,
 }
 
-#[derive(Debug, Clone, Component, Deserialize)]
+#[derive(Debug, Clone, Component, Deserialize, JsonSchema)]
 pub struct TextPopup {
     pub text: String,
+    #[schemars(with = "crate::schemar_proxies::Color")]
     pub color: Color,
     #[serde(deserialize_with = "deserialize_font")]
+    #[schemars(with = "FontSettings")]
     pub font: TextFont,
 }
 
+#[derive(Deserialize, JsonSchema)]
+struct FontSettings {
+    size: f32,
+}
+impl From<FontSettings> for TextFont {
+    fn from(value: FontSettings) -> Self {
+        TextFont {
+            font_size: FontSize::Px(value.size),
+            ..default()
+        }
+    }
+}
 pub fn deserialize_font<'de, D>(deserializer: D) -> Result<TextFont, D::Error>
 where
     D: Deserializer<'de>,
 {
-    #[derive(Deserialize)]
-    struct Proxy {
-        size: f32,
-    }
-
-    impl From<Proxy> for TextFont {
-        fn from(value: Proxy) -> Self {
-            TextFont {
-                font_size: FontSize::Px(value.size),
-                ..default()
-            }
-        }
-    }
-
-    Ok(Proxy::deserialize(deserializer)?.into())
+    Ok(FontSettings::deserialize(deserializer)?.into())
 }
 pub struct PopupPlugin;
 
