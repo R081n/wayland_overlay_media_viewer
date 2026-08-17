@@ -4,7 +4,7 @@ use bevy::{
     color::{Color, Srgba},
     math::{Vec2, Vec3},
 };
-use rand::{RngExt, seq::SliceRandom};
+use rand::{seq::SliceRandom, RngExt};
 use wayland_overlay_media_viewer::{
     position::{
         Anchor, FullScreenMode, HorizontalAnchor, PopupPosition, ScreenspacePosition,
@@ -99,49 +99,48 @@ fn main() {
 
     let clone = sender.clone();
 
-    std::thread::spawn(move || {
-        loop {
-            let texts = [
-                "It is done (kinda)",
-                "Now i can sleep finaly",
-                "Maybe we'll have more linux users in the future",
-                "I have bested thee, wayland",
-                "look pretty screen",
-                "Yay pretty spiral (it even extends over every screeen)",
-            ];
+    std::thread::spawn(move || loop {
+        let texts = [
+            "It is done (kinda)",
+            "Now i can sleep finaly",
+            "Maybe we'll have more linux users in the future",
+            "I have bested thee, wayland",
+            "look pretty screen",
+            "Yay pretty spiral (it even extends over every screeen)",
+            "More text to test",
+        ];
 
-            let idx = rand::rng().random_range(..texts.len());
-            _ = clone.send(ObjectMessage {
-                kind: ObjectType::Text(TextPopup {
-                    text: texts[idx].to_owned(),
-                    color: Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)),
-                    font: bevy::text::TextFont {
-                        font_size: bevy::text::FontSize::Px(60.0),
-                        weight: bevy::text::FontWeight(5),
-                        ..Default::default()
-                    },
-                }),
-                position: PopupPosition::Global(Vec3::new(0., 100., 0.)),
-                layer: PopupLayer::Above,
-                popup_animation: PopupInAnimation::SlideFadeIn,
-                behaviour: PopupInteraction::ClickThrough,
-                opacity: 0.2,
-                close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
-                close_condition: ObjectCloseCondition {
-                    duration: Some(Duration::from_secs(10)),
-                    click: Some(CloseClickSettings::default()),
+        let idx = rand::rng().random_range(..texts.len());
+        _ = clone.send(ObjectMessage {
+            kind: ObjectType::Text(TextPopup {
+                text: texts[idx].to_owned(),
+                color: Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)),
+                font: bevy::text::TextFont {
+                    font_size: bevy::text::FontSize::Px(60.0),
+                    weight: bevy::text::FontWeight(5),
+                    ..Default::default()
                 },
-                movement: Movement::CdBounce(CdBounce {
-                    speed: Vec2::new(1.0, 0.5),
-                    angle_uncertanty: 2.1,
-                    speed_uncertanty: 2.1,
-                    speed_range: (0.1, 10.0),
-                }),
-                size: PopupSize::Auto,
-            });
+            }),
+            position: PopupPosition::Global(Vec3::new(0., 100., 0.)),
+            layer: PopupLayer::Above,
+            popup_animation: PopupInAnimation::SlideFadeIn,
+            behaviour: PopupInteraction::ClickThrough,
+            opacity: 0.2,
+            close_animation: PopupOutAnimation::FadeOut { decay_rate: 1.0 },
+            close_condition: ObjectCloseCondition {
+                duration: Some(Duration::from_secs(10)),
+                click: Some(CloseClickSettings::default()),
+            },
+            movement: Movement::CdBounce(CdBounce {
+                speed: Vec2::new(1.0, 0.5),
+                angle_uncertanty: 2.1,
+                speed_uncertanty: 2.1,
+                speed_range: (0.1, 10.0),
+            }),
+            size: PopupSize::Auto,
+        });
 
-            std::thread::sleep(Duration::from_millis(1000));
-        }
+        std::thread::sleep(Duration::from_millis(1000));
     });
 
     for line in std::io::stdin().lines() {
